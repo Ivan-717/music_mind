@@ -1,0 +1,725 @@
+MusicMind 音乐数据模型 v2.0
+一、系统定位
+
+MusicMind 是一个 AI 音乐助手系统。
+
+整体架构：
+
+             User
+              |
+              |
+            Agent
+              |
+      -----------------
+      |               |
+    MySQL          Qdrant
+      |               |
+结构化事实       语义知识
+
+职责：
+
+模块	职责
+MySQL	音乐实体和关系数据
+Qdrant	音乐语义向量
+Agent	理解需求、调用工具、生成答案
+二、核心数据来源
+
+第一阶段：
+
+MusicBrainz
+      |
+      |
+ Data Adapter
+      |
+      |
+ Repository
+      |
+      |
+ MySQL
+
+MusicBrainz负责提供：
+
+Artist
+Release Group
+Release
+Recording
+Track
+Artist Credit
+
+MusicMind负责扩展：
+
+Genre
+Mood
+Scene
+Language
+Region
+用户数据
+三、核心音乐实体
+
+第一阶段：
+
+Artist
+
+Album
+
+Release
+
+Track
+
+TrackArtist
+
+ReleaseTrack
+四、Artist
+
+艺术家。
+
+例如：
+
+周杰伦
+林俊杰
+陈奕迅
+五月天
+
+数据库：
+
+Artist
+--------------------------------
+
+id
+
+musicbrainz_id
+
+name
+
+sort_name
+
+alias
+
+description
+
+avatar
+
+country
+
+region_id
+
+debut_date
+
+created_at
+
+updated_at
+
+说明：
+
+musicbrainz_id
+
+用于关联外部音乐知识。
+
+例如：
+
+a223958d-5c56...
+五、Album
+
+Album 对应 MusicBrainz Release Group。
+
+表示：
+
+一张音乐作品集合
+
+例如：
+
+范特西
+
+七里香
+
+她说
+
+表：
+
+Album
+--------------------------------
+
+id
+
+musicbrainz_id
+
+name
+
+artist_id
+
+description
+
+cover_url
+
+release_date
+
+primary_type
+
+secondary_type
+
+created_at
+
+updated_at
+
+关系：
+
+Artist
+
+1
+
+|
+
+N
+
+Album
+六、Release
+
+Release 表示具体发行版本。
+
+例如：
+
+《范特西》：
+
+Album:
+
+范特西
+
+
+Release:
+
+台湾 CD版
+
+2001-09-20
+
+日本版
+
+数字版
+
+表：
+
+Release
+--------------------------------
+
+id
+
+musicbrainz_id
+
+album_id
+
+title
+
+release_date
+
+country
+
+status
+
+created_at
+
+updated_at
+
+关系：
+
+Album
+
+1
+
+|
+
+N
+
+Release
+七、Track
+
+音乐作品。
+
+例如：
+
+愛在西元前
+
+晴天
+
+夜曲
+
+表：
+
+Track
+--------------------------------
+
+id
+
+musicbrainz_recording_id
+
+name
+
+duration
+
+description
+
+energy
+
+created_at
+
+updated_at
+
+注意：
+
+Track 不直接属于 Album。
+
+真实关系：
+
+Album
+
+ |
+
+Release
+
+ |
+
+ReleaseTrack
+
+ |
+
+Track
+
+八、ReleaseTrack
+
+发行版本中的歌曲列表。
+
+例如：
+
+《范特西》
+
+1 愛在西元前
+
+2 爸 我回來了
+
+3 簡單愛
+
+...
+
+10 安靜
+
+表：
+
+ReleaseTrack
+--------------------------------
+
+id
+
+release_id
+
+track_id
+
+disc_number
+
+track_number
+
+created_at
+九、TrackArtist
+
+歌曲和艺术家的多对多关系。
+
+例如：
+
+周杰伦
+feat
+蔡依林
+
+表：
+
+TrackArtist
+--------------------------------
+
+id
+
+track_id
+
+artist_id
+
+role
+
+credited_name
+
+created_at
+
+role:
+
+演唱
+
+作词
+
+作曲
+
+制作
+
+编曲
+十、音乐标签体系
+
+后续扩展：
+
+Genre
+
+Mood
+
+Scene
+
+Language
+
+Region
+十一、Genre
+
+音乐类型。
+
+例如：
+
+流行
+
+摇滚
+
+R&B
+
+电子
+
+表：
+
+Genre
+--------------------------------
+
+id
+
+name
+
+parent_id
+
+description
+
+created_at
+
+updated_at
+
+支持：
+
+流行
+
+ └── 华语流行
+十二、TrackGenre
+Track N:M Genre
+
+表：
+
+TrackGenre
+--------------------------------
+
+id
+
+track_id
+
+genre_id
+
+created_at
+十三、Mood
+
+音乐情绪。
+
+例如：
+
+治愈
+
+忧郁
+
+青春
+
+怀旧
+
+表：
+
+Mood
+--------------------------------
+
+id
+
+name
+
+description
+
+created_at
+
+updated_at
+十四、TrackMood
+Track N:M Mood
+十五、Scene
+
+使用场景。
+
+例如：
+
+学习
+
+编程
+
+通勤
+
+夜晚
+
+运动
+十六、TrackScene
+Track N:M Scene
+十七、Language
+
+歌曲语言。
+
+例如：
+
+中文
+
+粤语
+
+英语
+
+日语
+
+纯音乐
+十八、TrackLanguage
+Track N:M Language
+十九、Region
+
+音乐地区。
+
+例如：
+
+中国
+
+ ├── 中国大陆
+
+ ├── 中国香港
+
+ └── 中国台湾
+
+表：
+
+Region
+--------------------------------
+
+id
+
+name
+
+parent_id
+
+description
+
+created_at
+
+updated_at
+二十、TrackRegion
+Track N:M Region
+二十一、用户系统（第二阶段）
+
+暂不实现：
+
+User
+
+Favorite
+
+Playlist
+
+PlaylistTrack
+
+PlayHistory
+
+原因：
+
+第一阶段目标：
+
+完成音乐知识库。
+
+二十二、Artist Relation（后续）
+
+艺术家关系：
+
+合作
+
+影响
+
+成员
+
+师承
+
+表：
+
+ArtistRelation
+
+id
+
+source_artist_id
+
+target_artist_id
+
+relation_type
+
+description
+
+created_at
+二十三、Similar Artist
+
+不存固定关系。
+
+采用：
+
+Embedding
+
++
+
+Vector Search
+
++
+
+RAG
+
+动态计算。
+
+二十四、第一阶段 MySQL 表
+
+当前实现：
+
+artist
+
+album
+
+release
+
+track
+
+track_artist
+
+release_track
+
+下一步：
+
+genre
+
+track_genre
+
+mood
+
+track_mood
+
+scene
+
+track_scene
+
+language
+
+track_language
+
+region
+
+track_region
+二十五、当前项目架构
+
+现在代码：
+
+data-pipeline
+
+│
+
+├── musicbrainz
+
+│    ├── client.py
+
+│    └── adapter.py
+
+
+├── repository
+
+│    ├── artist_repository.py
+
+│    ├── album_repository.py
+
+│    ├── release_repository.py
+
+│    └── track_repository.py
+
+
+├── database
+
+│    └── connection.py
+
+
+├── test
+
+│
+
+
+└── main.py
+二十六、下一阶段开发路线
+
+现在已经完成：
+
+MusicBrainz Adapter
++
+Repository
++
+MySQL Schema
+
+下一步：
+
+1. 完成所有 Repository
+AlbumRepository
+
+ReleaseRepository
+
+TrackRepository
+
+TrackArtistRepository
+
+ReleaseTrackRepository
+2. 编写 Import Pipeline
+
+目标：
+
+一句代码：
+
+import_artist("周杰伦")
+
+自动：
+
+Artist
+
+↓
+
+Album
+
+↓
+
+Release
+
+↓
+
+Track
+
+↓
+
+Relations
+
+↓
+
+MySQL
+3. 添加 AI 数据层
+
+之后：
+
+MySQL
+ |
+ |
+Embedding
+ |
+ |
+Qdrant
+ |
+ |
+RAG
+ |
+ |
+Agent
