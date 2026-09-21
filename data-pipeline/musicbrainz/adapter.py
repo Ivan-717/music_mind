@@ -1,5 +1,25 @@
 from typing import Any
+from datetime import datetime
 
+def normalize_date(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    for fmt in (
+        "%Y-%m-%d",
+        "%Y-%m",
+        "%Y",
+    ):
+        try:
+            return datetime.strptime(
+                value,
+                fmt
+            ).date().isoformat()
+
+        except ValueError:
+            continue
+
+    return None
 
 class MusicBrainzDataAdapter:
 
@@ -26,7 +46,7 @@ class MusicBrainzDataAdapter:
             result.append(
                 {
                     "name": alias["name"],
-                    "locale": alias.get("locale"),
+                    "locale": alias.get("locale") or "",
                     "is_primary": alias.get("primary", False),
                 }
             )
@@ -40,7 +60,9 @@ class MusicBrainzDataAdapter:
         return {
             "musicbrainz_id": data["id"],
             "name": data["title"],
-            "release_date": data.get("first-release-date"),
+            "release_date": normalize_date(
+                 data.get("first-release-date")
+            ),
             "primary_type": data.get("primary-type"),
             "secondary_types": data.get("secondary-types", []),
         }
@@ -145,7 +167,9 @@ class MusicBrainzDataAdapter:
             "musicbrainz_id": data["id"],
             "album_musicbrainz_id": release_group.get("id"),
             "title": data["title"],
-            "release_date": data.get("date"),
+            "release_date": normalize_date(
+                data.get("date")
+            ),
             "country": data.get("country"),
             "status": data.get("status"),
         }

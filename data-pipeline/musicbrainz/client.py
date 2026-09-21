@@ -152,18 +152,20 @@ class MusicBrainzClient:
     def get_artist(
         self,
         artist_mbid: str,
+        inc: str = "aliases"
     ) -> dict[str, Any]:
         """
         根据 MBID 获取 Artist。
         """
         return self.get(
             f"/artist/{artist_mbid}",
+            params={"inc": inc},
         )
 
     def get_artist_releases(
         self,
         artist_mbid: str,
-        limit: int = 25,
+        limit: int = 100,
         offset: int = 0,
     ) -> dict[str, Any]:
         """

@@ -26,14 +26,14 @@ class AlbumRepository:
             primary_type,
             secondary_types
         )
-        VALUES (%s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s) AS new
 
         ON DUPLICATE KEY UPDATE
 
-            name = VALUES(name),
-            release_date = VALUES(release_date),
-            primary_type = VALUES(primary_type),
-            secondary_types = VALUES(secondary_types)
+            name = new.name,
+            release_date = new.release_date,
+            primary_type = new.primary_type,
+            secondary_types = new.secondary_types
         """
 
 
@@ -72,4 +72,4 @@ class AlbumRepository:
         self.connection.commit()
 
 
-        return result[0]
+        return result["id"]

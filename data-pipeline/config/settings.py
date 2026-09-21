@@ -9,6 +9,7 @@
 import os
 from pathlib import Path
 
+import pymysql
 from dotenv import load_dotenv
 
 # config/settings.py -> config/ -> data-pipeline/ -> 项目根目录
@@ -24,6 +25,7 @@ MYSQL_CONFIG = {
     "password": os.getenv("MYSQL_PASSWORD", ""),
     "database": os.getenv("MYSQL_DATABASE", "musicmind"),
     "charset": "utf8mb4",
+    "cursorclass": pymysql.cursors.DictCursor,
 }
 
 MUSICBRAINZ_CONFIG = {

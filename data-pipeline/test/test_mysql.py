@@ -7,7 +7,7 @@ def main():
         with connection.cursor() as cursor:
             cursor.execute("SELECT DATABASE()")
             result = cursor.fetchone()
-            print("当前数据库：", result[0])
+            print("当前数据库：", result["db"])
     finally:
         connection.close()
 
