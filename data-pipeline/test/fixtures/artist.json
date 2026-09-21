@@ -1,0 +1,204 @@
+{
+  "sort-name": "Chou, Jay",
+  "country": "TW",
+  "type": "Person",
+  "gender": "Male",
+  "disambiguation": "",
+  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+  "name": "周杰倫",
+  "life-span": {
+    "begin": "1979-01-18",
+    "ended": false,
+    "end": null
+  },
+  "end-area": null,
+  "gender-id": "36d3d30a-839d-3eda-8cb3-29be4384e4a9",
+  "isnis": [
+    "0000000079929525"
+  ],
+  "ipis": [
+    "00408007493"
+  ],
+  "area": {
+    "name": "Taiwan",
+    "iso-3166-2-codes": [
+      "CN-71"
+    ],
+    "type-id": null,
+    "disambiguation": "",
+    "iso-3166-1-codes": [
+      "TW"
+    ],
+    "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+    "type": null,
+    "sort-name": "Taiwan"
+  },
+  "begin-area": {
+    "type": null,
+    "sort-name": "New Taipei City",
+    "type-id": null,
+    "iso-3166-2-codes": [
+      "TW-TPQ"
+    ],
+    "name": "New Taipei City",
+    "id": "f1c6ae76-bc95-4c2c-9c69-1eff4db8949b",
+    "disambiguation": ""
+  },
+  "aliases": [
+    {
+      "locale": "en",
+      "name": "Chieh-Lun Chou",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "begin": null,
+      "primary": false,
+      "ended": false,
+      "end": null,
+      "type": "Artist name",
+      "sort-name": "Chou, Chieh-Lun"
+    },
+    {
+      "locale": "en",
+      "name": "Jay",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "primary": false,
+      "ended": false,
+      "begin": null,
+      "sort-name": "Jay",
+      "end": null,
+      "type": "Artist name"
+    },
+    {
+      "end": null,
+      "type": "Artist name",
+      "sort-name": "Chou, Jay",
+      "begin": null,
+      "ended": false,
+      "primary": true,
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "Jay Chou",
+      "locale": "en"
+    },
+    {
+      "locale": "en",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "Jie-Luen Jou",
+      "begin": null,
+      "ended": false,
+      "primary": false,
+      "type": "Artist name",
+      "end": null,
+      "sort-name": "Jou, Jie-Luen"
+    },
+    {
+      "locale": "en",
+      "name": "Jie-Lun Jhou",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "primary": false,
+      "ended": false,
+      "begin": null,
+      "sort-name": "Jhou, Jie-Lun",
+      "end": null,
+      "type": "Artist name"
+    },
+    {
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "Jie-Lun Zhou",
+      "locale": "en",
+      "sort-name": "Zhou, Jie-Lun",
+      "end": null,
+      "type": "Artist name",
+      "ended": false,
+      "primary": false,
+      "begin": null
+    },
+    {
+      "primary": false,
+      "ended": false,
+      "begin": null,
+      "sort-name": "Zhou Jie Lun",
+      "end": null,
+      "type": "Artist name",
+      "locale": "zh_Latn",
+      "name": "Zhou Jie Lun",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+    },
+    {
+      "type": "Artist name",
+      "end": null,
+      "sort-name": "Zhou Jielun",
+      "begin": null,
+      "ended": false,
+      "primary": false,
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "Zhou Jielun",
+      "locale": "zh_Latn"
+    },
+    {
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "Zhōu Jié Lún",
+      "locale": "zh_Latn",
+      "end": null,
+      "type": "Artist name",
+      "sort-name": "Zhōu Jié Lún",
+      "begin": null,
+      "ended": false,
+      "primary": false
+    },
+    {
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "ジェイ・チョウ",
+      "locale": "ja",
+      "end": null,
+      "type": "Artist name",
+      "sort-name": "ジェイ・チョウ",
+      "begin": null,
+      "ended": false,
+      "primary": true
+    },
+    {
+      "locale": "zh_Hans",
+      "name": "周杰伦",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "primary": true,
+      "ended": false,
+      "begin": null,
+      "sort-name": "周杰伦",
+      "end": null,
+      "type": "Artist name"
+    },
+    {
+      "primary": true,
+      "ended": false,
+      "begin": null,
+      "sort-name": "周杰倫",
+      "type": "Artist name",
+      "end": null,
+      "locale": "zh_Hant",
+      "name": "周杰倫",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc"
+    },
+    {
+      "type": "Artist name",
+      "end": null,
+      "sort-name": "周杰倫",
+      "begin": null,
+      "primary": true,
+      "ended": false,
+      "name": "周杰倫",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "locale": "zh_Hant_TW"
+    },
+    {
+      "begin": null,
+      "ended": false,
+      "primary": true,
+      "end": null,
+      "type": "Artist name",
+      "sort-name": "주걸륜",
+      "locale": "ko",
+      "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+      "name": "주걸륜"
+    }
+  ],
+  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+}

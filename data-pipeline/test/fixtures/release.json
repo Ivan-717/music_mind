@@ -1,0 +1,547 @@
+{
+  "asin": null,
+  "media": [
+    {
+      "id": "d66d4b86-01eb-35ec-bf16-9526f807a56c",
+      "track-offset": 0,
+      "track-count": 10,
+      "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
+      "title": "",
+      "tracks": [
+        {
+          "artist-credit": [
+            {
+              "joinphrase": "",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "type": "Person",
+                "disambiguation": "",
+                "country": "TW",
+                "sort-name": "Chou, Jay",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+              },
+              "name": "周杰倫"
+            }
+          ],
+          "number": "1",
+          "recording": {
+            "id": "d740fb6d-0d76-43be-b29e-2ccc90d653f9",
+            "first-release-date": "2001-09-20",
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "country": "TW",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "sort-name": "Chou, Jay"
+                },
+                "name": "周杰倫"
+              }
+            ],
+            "disambiguation": "",
+            "title": "愛在西元前",
+            "video": false,
+            "length": 234253
+          },
+          "id": "7285a091-d35c-3227-bc3f-f5ed21ed2ebe",
+          "position": 1,
+          "title": "愛在西元前",
+          "length": 234253
+        },
+        {
+          "position": 2,
+          "title": "爸 我回來了",
+          "length": 235640,
+          "artist-credit": [
+            {
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "type": "Person",
+                "country": "TW",
+                "disambiguation": "",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay"
+              },
+              "joinphrase": "",
+              "name": "周杰倫"
+            }
+          ],
+          "number": "2",
+          "id": "b5ec557f-8cc8-3f79-bca8-1e675cbfc592",
+          "recording": {
+            "disambiguation": "",
+            "title": "爸 我回來了",
+            "video": false,
+            "length": 235640,
+            "first-release-date": "2001-09-20",
+            "artist-credit": [
+              {
+                "name": "周杰倫",
+                "artist": {
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫",
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "disambiguation": "",
+                  "type": "Person",
+                  "country": "TW"
+                },
+                "joinphrase": ""
+              }
+            ],
+            "id": "6630ad02-c023-43e3-8926-d19b4ea0a83c"
+          }
+        },
+        {
+          "artist-credit": [
+            {
+              "artist": {
+                "type": "Person",
+                "country": "TW",
+                "disambiguation": "",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay",
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b"
+              },
+              "joinphrase": "",
+              "name": "周杰倫"
+            }
+          ],
+          "number": "3",
+          "id": "f640a424-5ea4-3b2e-8721-18926b0b6a68",
+          "recording": {
+            "disambiguation": "",
+            "length": 270986,
+            "title": "簡單愛",
+            "video": false,
+            "artist-credit": [
+              {
+                "name": "周杰倫",
+                "artist": {
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "TW",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫"
+                },
+                "joinphrase": ""
+              }
+            ],
+            "first-release-date": "2001-09-20",
+            "id": "b4ced55b-b128-4ea9-9f9d-8de834b8342f"
+          },
+          "position": 3,
+          "title": "簡單愛",
+          "length": 270986
+        },
+        {
+          "length": 158520,
+          "title": "忍者",
+          "position": 4,
+          "recording": {
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "country": "TW",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫"
+                },
+                "name": "周杰倫"
+              }
+            ],
+            "first-release-date": "2001-09-20",
+            "id": "da321abb-ae0e-4ecb-8780-7a99a10022e1",
+            "disambiguation": "",
+            "length": 158520,
+            "video": false,
+            "title": "忍者"
+          },
+          "id": "6c320750-1688-32e9-9cf2-efe67430f409",
+          "number": "4",
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "joinphrase": "",
+              "artist": {
+                "sort-name": "Chou, Jay",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "type": "Person",
+                "country": "TW",
+                "disambiguation": "",
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b"
+              }
+            }
+          ]
+        },
+        {
+          "recording": {
+            "artist-credit": [
+              {
+                "name": "周杰倫",
+                "joinphrase": "",
+                "artist": {
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "TW",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫"
+                }
+              }
+            ],
+            "first-release-date": "2001-09-20",
+            "id": "c035b53f-f595-4224-9f9d-f343490aad1f",
+            "disambiguation": "",
+            "length": 284973,
+            "title": "開不了口",
+            "video": false
+          },
+          "id": "b7850ebf-3029-3fc2-a6dc-758a89d81599",
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "country": "TW",
+                "type": "Person",
+                "disambiguation": "",
+                "sort-name": "Chou, Jay",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "number": "5",
+          "title": "開不了口",
+          "length": 284973,
+          "position": 5
+        },
+        {
+          "length": 195800,
+          "title": "上海 一九四三",
+          "position": 6,
+          "recording": {
+            "disambiguation": "",
+            "title": "上海 一九四三",
+            "video": false,
+            "length": 195800,
+            "first-release-date": "2001-09-20",
+            "artist-credit": [
+              {
+                "name": "周杰倫",
+                "joinphrase": "",
+                "artist": {
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "country": "TW",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫"
+                }
+              }
+            ],
+            "id": "5302baa6-3ad8-4d4e-ae3d-18a75594b4fc"
+          },
+          "id": "3b9c0b6d-7f2b-32ad-acb4-fbb9bfe85ca4",
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "disambiguation": "",
+                "type": "Person",
+                "country": "TW",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "number": "6"
+        },
+        {
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "type": "Person",
+                "country": "TW",
+                "disambiguation": "",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "number": "7",
+          "id": "f0a0c1f8-d4f2-3221-b56a-ac081b68a78b",
+          "recording": {
+            "first-release-date": "2001-09-20",
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "type": "Person",
+                  "country": "TW",
+                  "disambiguation": "",
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫"
+                },
+                "name": "周杰倫"
+              }
+            ],
+            "id": "5ca5b3fe-5b49-4f95-9eb0-48777380ee12",
+            "title": "對不起",
+            "video": false,
+            "length": 225413,
+            "disambiguation": ""
+          },
+          "position": 7,
+          "length": 225413,
+          "title": "對不起"
+        },
+        {
+          "position": 8,
+          "title": "威廉古堡",
+          "length": 236186,
+          "number": "8",
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "joinphrase": "",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay",
+                "disambiguation": "",
+                "type": "Person",
+                "country": "TW"
+              }
+            }
+          ],
+          "recording": {
+            "video": false,
+            "title": "威廉古堡",
+            "length": 236186,
+            "disambiguation": "",
+            "first-release-date": "2001-09-20",
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "name": "周杰倫",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "sort-name": "Chou, Jay",
+                  "disambiguation": "",
+                  "type": "Person",
+                  "country": "TW"
+                },
+                "name": "周杰倫"
+              }
+            ],
+            "id": "5d823017-2d4c-4333-a0c6-22722498cae2"
+          },
+          "id": "582f5766-8b87-3fc9-8f09-f7769ce093b4"
+        },
+        {
+          "position": 9,
+          "length": 201013,
+          "title": "雙截棍",
+          "artist-credit": [
+            {
+              "joinphrase": "",
+              "artist": {
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "name": "周杰倫",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Chou, Jay",
+                "disambiguation": "",
+                "type": "Person",
+                "country": "TW"
+              },
+              "name": "周杰倫"
+            }
+          ],
+          "number": "9",
+          "id": "28ed54ef-b468-38e7-82f4-a825fe95e4cd",
+          "recording": {
+            "artist-credit": [
+              {
+                "artist": {
+                  "name": "周杰倫",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "type": "Person",
+                  "country": "TW",
+                  "disambiguation": "",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "sort-name": "Chou, Jay"
+                },
+                "joinphrase": "",
+                "name": "周杰倫"
+              }
+            ],
+            "first-release-date": "2001-09-20",
+            "id": "2670aeef-8318-4f57-a114-dd0df077033f",
+            "disambiguation": "",
+            "length": 201013,
+            "video": false,
+            "title": "雙截棍"
+          }
+        },
+        {
+          "artist-credit": [
+            {
+              "name": "周杰倫",
+              "joinphrase": "",
+              "artist": {
+                "name": "周杰倫",
+                "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                "country": "TW",
+                "type": "Person",
+                "disambiguation": "",
+                "sort-name": "Chou, Jay",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+              }
+            }
+          ],
+          "number": "10",
+          "id": "1cb67b5e-6c59-38ad-aa84-abe98c469e24",
+          "recording": {
+            "length": 334240,
+            "video": false,
+            "title": "安靜",
+            "disambiguation": "",
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "name": "周杰倫",
+                  "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+                  "sort-name": "Chou, Jay",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "country": "TW"
+                },
+                "name": "周杰倫"
+              }
+            ],
+            "first-release-date": "2001-09-20",
+            "id": "8d0293fe-eea7-49e1-8840-4e3e9ad0d2c6"
+          },
+          "position": 10,
+          "title": "安靜",
+          "length": 334240
+        }
+      ],
+      "position": 1,
+      "format": "CD"
+    }
+  ],
+  "id": "0377c05a-0da4-46f7-a153-52e80e7adac1",
+  "quality": "high",
+  "date": "2001-09-20",
+  "release-events": [
+    {
+      "area": {
+        "type": null,
+        "disambiguation": "",
+        "sort-name": "Taiwan",
+        "type-id": null,
+        "iso-3166-2-codes": [
+          "CN-71"
+        ],
+        "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+        "name": "Taiwan",
+        "iso-3166-1-codes": [
+          "TW"
+        ]
+      },
+      "date": "2001-09-20"
+    }
+  ],
+  "packaging": null,
+  "release-group": {
+    "artist-credit": [
+      {
+        "name": "周杰倫",
+        "artist": {
+          "disambiguation": "",
+          "type": "Person",
+          "country": "TW",
+          "sort-name": "Chou, Jay",
+          "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+          "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+          "name": "周杰倫"
+        },
+        "joinphrase": ""
+      }
+    ],
+    "secondary-types": [],
+    "primary-type": "Album",
+    "first-release-date": "2001-09-20",
+    "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+    "secondary-type-ids": [],
+    "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+    "title": "范特西",
+    "disambiguation": ""
+  },
+  "title": "范特西",
+  "disambiguation": "",
+  "artist-credit": [
+    {
+      "name": "周杰倫",
+      "joinphrase": "",
+      "artist": {
+        "country": "TW",
+        "type": "Person",
+        "disambiguation": "",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "sort-name": "Chou, Jay",
+        "id": "a223958d-5c56-4b2c-a30a-87e357bc121b",
+        "name": "周杰倫"
+      }
+    }
+  ],
+  "cover-art-archive": {
+    "artwork": true,
+    "front": true,
+    "back": false,
+    "darkened": false,
+    "count": 1
+  },
+  "status": "Official",
+  "packaging-id": null,
+  "barcode": "743218940323",
+  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+  "text-representation": {
+    "script": "Hant",
+    "language": "zho"
+  },
+  "country": "TW"
+}

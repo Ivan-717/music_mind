@@ -15,7 +15,8 @@ class AlbumRepository:
 
     def upsert(
         self,
-        album: dict[str, Any]
+        album: dict[str, Any],
+        autocommit: bool = True,
     ) -> int:
 
         sql = """
@@ -68,8 +69,8 @@ class AlbumRepository:
 
             result = cursor.fetchone()
 
-
-        self.connection.commit()
+        if autocommit:
+            self.connection.commit()
 
 
         return result["id"]

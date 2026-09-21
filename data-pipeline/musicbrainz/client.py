@@ -180,6 +180,7 @@ class MusicBrainzClient:
                 "artist": artist_mbid,
                 "limit": limit,
                 "offset": offset,
+                "inc": "release-groups"
             },
         )
 

@@ -1,0 +1,1328 @@
+{
+  "release-offset": 0,
+  "releases": [
+    {
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "id": "0377c05a-0da4-46f7-a153-52e80e7adac1",
+      "release-group": {
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "范特西",
+        "primary-type": "Album",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "first-release-date": "2001-09-20",
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658"
+      },
+      "date": "2001-09-20",
+      "country": "TW",
+      "title": "范特西",
+      "release-events": [
+        {
+          "date": "2001-09-20",
+          "area": {
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "type": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "sort-name": "Taiwan"
+          }
+        }
+      ],
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "quality": "high",
+      "packaging": null,
+      "barcode": "743218940323",
+      "cover-art-archive": {
+        "count": 1,
+        "darkened": false,
+        "artwork": true,
+        "back": false,
+        "front": true
+      },
+      "asin": null,
+      "disambiguation": ""
+    },
+    {
+      "id": "16ba8f54-2638-4cf9-86f5-2396bc38ec5c",
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "packaging-id": null,
+      "country": "TW",
+      "title": "拍檔#周杰倫 方文山聯手創作精選",
+      "release-group": {
+        "id": "bd40ab7a-a2c7-323f-a4ca-f850321dd9af",
+        "first-release-date": "2002-04-01",
+        "secondary-type-ids": [
+          "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+        ],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "primary-type": "Album",
+        "disambiguation": "",
+        "title": "拍檔#周杰倫 方文山聯手創作精選",
+        "secondary-types": [
+          "Compilation"
+        ]
+      },
+      "date": "2002-04-01",
+      "packaging": null,
+      "quality": "normal",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "release-events": [
+        {
+          "date": "2002-04-01",
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "sort-name": "Taiwan",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "disambiguation": ""
+          }
+        }
+      ],
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "darkened": false,
+        "count": 1,
+        "artwork": true,
+        "back": false,
+        "front": true
+      },
+      "barcode": "743219426628"
+    },
+    {
+      "asin": null,
+      "disambiguation": "",
+      "cover-art-archive": {
+        "back": false,
+        "count": 0,
+        "darkened": false,
+        "artwork": false,
+        "front": false
+      },
+      "barcode": null,
+      "packaging": null,
+      "quality": "normal",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "status": "Pseudo-Release",
+      "release-events": [
+        {
+          "date": "2001-09-20",
+          "area": null
+        }
+      ],
+      "country": null,
+      "title": "范特西 Fantasy",
+      "release-group": {
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "first-release-date": "2001-09-20",
+        "title": "范特西",
+        "disambiguation": "",
+        "secondary-types": [],
+        "primary-type": "Album"
+      },
+      "date": "2001-09-20",
+      "id": "1d73f3c0-1519-4878-969f-ac84725ac71e",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": null
+      }
+    },
+    {
+      "quality": "normal",
+      "packaging": null,
+      "release-events": [
+        {
+          "date": "2000-11-07",
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "sort-name": "Taiwan",
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": ""
+          }
+        }
+      ],
+      "status": "Pseudo-Release",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "cover-art-archive": {
+        "darkened": false,
+        "count": 1,
+        "artwork": true,
+        "back": false,
+        "front": true
+      },
+      "disambiguation": "",
+      "asin": null,
+      "barcode": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Latn"
+      },
+      "packaging-id": null,
+      "id": "255fd620-e9d8-4470-9cf5-2c73b46aabf6",
+      "title": "Jay",
+      "country": "TW",
+      "date": "2000-11-07",
+      "release-group": {
+        "primary-type": "Album",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "Jay",
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": []
+      }
+    },
+    {
+      "date": "2001-12",
+      "release-group": {
+        "disambiguation": "",
+        "title": "Fantasy Plus",
+        "secondary-types": [
+          "Live"
+        ],
+        "primary-type": "EP",
+        "secondary-type-ids": [
+          "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+        ],
+        "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+        "id": "c91314f2-5b6c-39b6-8fd2-74fbc4ad2477",
+        "first-release-date": "2001-12-24"
+      },
+      "title": "Fantasy Plus",
+      "country": "TW",
+      "id": "2645f6b3-6f12-4dc1-9ad3-0d86709d425a",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "barcode": "743219150424",
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "front": true,
+        "darkened": false,
+        "count": 4,
+        "artwork": true,
+        "back": true
+      },
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "release-events": [
+        {
+          "date": "2001-12",
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "disambiguation": "",
+            "sort-name": "Taiwan"
+          }
+        }
+      ],
+      "packaging": null,
+      "quality": "normal"
+    },
+    {
+      "release-group": {
+        "primary-type": "Album",
+        "disambiguation": "",
+        "title": "范特西",
+        "secondary-types": [],
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "first-release-date": "2001-09-20",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+      },
+      "date": "2001",
+      "country": "CN",
+      "title": "范特西",
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Hans",
+        "language": "zho"
+      },
+      "id": "288d4c19-514a-4378-a11c-148949af0e87",
+      "barcode": "9787799602851",
+      "cover-art-archive": {
+        "front": true,
+        "count": 2,
+        "artwork": true,
+        "darkened": false,
+        "back": false
+      },
+      "disambiguation": "",
+      "asin": "B003UERAV0",
+      "release-events": [
+        {
+          "area": {
+            "name": "China",
+            "id": "7c81bb69-a99b-3487-b6d4-0f76d7a29ca0",
+            "type": null,
+            "sort-name": "China",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "CN"
+            ],
+            "disambiguation": ""
+          },
+          "date": "2001"
+        }
+      ],
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "quality": "normal",
+      "packaging": null
+    },
+    {
+      "id": "29d1ff9a-8d50-406e-b2f7-ff2ec83d8bc3",
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "packaging-id": null,
+      "date": "2001-12-24",
+      "release-group": {
+        "disambiguation": "",
+        "title": "Fantasy Plus",
+        "secondary-types": [
+          "Live"
+        ],
+        "primary-type": "EP",
+        "secondary-type-ids": [
+          "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+        ],
+        "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+        "id": "c91314f2-5b6c-39b6-8fd2-74fbc4ad2477",
+        "first-release-date": "2001-12-24"
+      },
+      "title": "Fantasy Plus",
+      "country": "TW",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "release-events": [
+        {
+          "area": {
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "type": null,
+            "type-id": null,
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "sort-name": "Taiwan"
+          },
+          "date": "2001-12-24"
+        }
+      ],
+      "packaging": null,
+      "quality": "normal",
+      "barcode": "",
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "count": 0,
+        "artwork": false,
+        "darkened": false,
+        "back": false,
+        "front": false
+      }
+    },
+    {
+      "id": "3359a7f8-b32d-3d64-8abd-05a2e86ac003",
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "release-group": {
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "primary-type": "Album",
+        "secondary-types": [],
+        "title": "Jay",
+        "disambiguation": ""
+      },
+      "date": "2001",
+      "country": "CN",
+      "title": "Jay",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "release-events": [
+        {
+          "area": {
+            "id": "7c81bb69-a99b-3487-b6d4-0f76d7a29ca0",
+            "name": "China",
+            "type": null,
+            "sort-name": "China",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "CN"
+            ],
+            "disambiguation": ""
+          },
+          "date": "2001"
+        }
+      ],
+      "packaging": null,
+      "quality": "high",
+      "barcode": "9787799300054",
+      "asin": null,
+      "disambiguation": "",
+      "cover-art-archive": {
+        "front": true,
+        "artwork": true,
+        "count": 1,
+        "darkened": false,
+        "back": false
+      }
+    },
+    {
+      "date": "2000-11-07",
+      "release-group": {
+        "disambiguation": "",
+        "title": "Jay",
+        "secondary-types": [],
+        "primary-type": "Album",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "first-release-date": "2000-11-07"
+      },
+      "title": "Jay",
+      "country": "TW",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "id": "50cf1798-c0c5-372a-97d7-12c32b648feb",
+      "barcode": "743218121449",
+      "cover-art-archive": {
+        "front": false,
+        "count": 0,
+        "artwork": false,
+        "darkened": false,
+        "back": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "release-events": [
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "sort-name": "Taiwan",
+            "type": null,
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5"
+          },
+          "date": "2000-11-07"
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "high",
+      "packaging": null
+    },
+    {
+      "id": "517193b2-3b15-4f65-924e-13937f9378d0",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "title": "Jay",
+      "country": "TW",
+      "date": "2001",
+      "release-group": {
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "Jay",
+        "primary-type": "Album",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679"
+      },
+      "packaging": null,
+      "quality": "normal",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "release-events": [
+        {
+          "date": "2001",
+          "area": {
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "sort-name": "Taiwan",
+            "type-id": null,
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type": null
+          }
+        }
+      ],
+      "disambiguation": "",
+      "asin": "B000FMQPAM",
+      "cover-art-archive": {
+        "front": false,
+        "back": false,
+        "darkened": false,
+        "count": 0,
+        "artwork": false
+      },
+      "barcode": "743218247927"
+    },
+    {
+      "id": "5193d964-d732-4d81-a99f-37f8e5bb14bb",
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Latn",
+        "language": "zho"
+      },
+      "country": "TW",
+      "title": "Bā dù kōngjiān",
+      "release-group": {
+        "primary-type": "Album",
+        "title": "八度空間",
+        "disambiguation": "",
+        "secondary-types": [],
+        "id": "796a921e-9370-3441-a755-f6d9adb2e8dc",
+        "first-release-date": "2002-07-18",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc"
+      },
+      "date": "2002-07-19",
+      "packaging": null,
+      "quality": "normal",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "status": "Pseudo-Release",
+      "release-events": [
+        {
+          "area": {
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "sort-name": "Taiwan",
+            "type": null,
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ]
+          },
+          "date": "2002-07-19"
+        }
+      ],
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "front": false,
+        "count": 0,
+        "darkened": false,
+        "artwork": false,
+        "back": false
+      },
+      "barcode": null
+    },
+    {
+      "barcode": null,
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "front": false,
+        "back": false,
+        "artwork": false,
+        "count": 0,
+        "darkened": false
+      },
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "status": "Pseudo-Release",
+      "release-events": [
+        {
+          "area": {
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "sort-name": "Taiwan",
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "type": null
+          },
+          "date": "2001-09-20"
+        }
+      ],
+      "packaging": null,
+      "quality": "normal",
+      "release-group": {
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "first-release-date": "2001-09-20",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "primary-type": "Album",
+        "title": "范特西",
+        "disambiguation": "",
+        "secondary-types": []
+      },
+      "date": "2001-09-20",
+      "country": "TW",
+      "title": "Fàntèxī",
+      "id": "51d4c239-6338-46b7-822d-f45d9616a73b",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Latn"
+      }
+    },
+    {
+      "release-events": [
+        {
+          "date": "2002-07-19",
+          "area": {
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "type": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "sort-name": "Taiwan"
+          }
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "normal",
+      "packaging": null,
+      "barcode": "743219599728",
+      "cover-art-archive": {
+        "front": true,
+        "count": 1,
+        "artwork": true,
+        "darkened": false,
+        "back": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "packaging-id": null,
+      "id": "58834222-e36a-49fe-b71e-27436faed9ce",
+      "date": "2002-07-19",
+      "release-group": {
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "796a921e-9370-3441-a755-f6d9adb2e8dc",
+        "first-release-date": "2002-07-18",
+        "disambiguation": "",
+        "title": "八度空間",
+        "secondary-types": [],
+        "primary-type": "Album"
+      },
+      "title": "八度空間",
+      "country": "TW"
+    },
+    {
+      "release-events": [
+        {
+          "area": {
+            "id": "7c81bb69-a99b-3487-b6d4-0f76d7a29ca0",
+            "name": "China",
+            "type": null,
+            "sort-name": "China",
+            "iso-3166-1-codes": [
+              "CN"
+            ],
+            "type-id": null,
+            "disambiguation": ""
+          },
+          "date": "2001"
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "normal",
+      "packaging": "Cassette Case",
+      "barcode": "9787799602868",
+      "cover-art-archive": {
+        "back": false,
+        "artwork": false,
+        "count": 0,
+        "darkened": false,
+        "front": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "text-representation": {
+        "script": "Hans",
+        "language": "zho"
+      },
+      "packaging-id": "c70b737a-0114-39a9-88f7-82843e54f906",
+      "id": "5c3809c3-afe5-3d29-9d7c-7b0b0966ec5e",
+      "date": "2001",
+      "release-group": {
+        "primary-type": "Album",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "范特西",
+        "first-release-date": "2001-09-20",
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": []
+      },
+      "title": "范特西",
+      "country": "CN"
+    },
+    {
+      "title": "The Eight Dimensions",
+      "country": "TW",
+      "date": "2002-07-19",
+      "release-group": {
+        "primary-type": "Album",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "八度空間",
+        "first-release-date": "2002-07-18",
+        "id": "796a921e-9370-3441-a755-f6d9adb2e8dc",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": []
+      },
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "packaging-id": null,
+      "id": "618862a7-ae65-43a2-bc0a-1f6d07930659",
+      "cover-art-archive": {
+        "darkened": false,
+        "count": 1,
+        "artwork": true,
+        "back": false,
+        "front": true
+      },
+      "asin": null,
+      "disambiguation": "",
+      "barcode": null,
+      "quality": "normal",
+      "packaging": null,
+      "release-events": [
+        {
+          "date": "2002-07-19",
+          "area": {
+            "type": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "sort-name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan"
+          }
+        }
+      ],
+      "status": "Pseudo-Release",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa"
+    },
+    {
+      "quality": "normal",
+      "packaging": null,
+      "release-events": [
+        {
+          "area": {
+            "sort-name": "Malaysia",
+            "iso-3166-1-codes": [
+              "MY"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "type": null,
+            "id": "305d19c7-c040-349c-8d5f-6ac75d2d2a09",
+            "name": "Malaysia"
+          },
+          "date": "2001"
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "cover-art-archive": {
+        "front": false,
+        "back": false,
+        "darkened": false,
+        "count": 0,
+        "artwork": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "barcode": "743219207128",
+      "packaging-id": null,
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "id": "7e130c78-be86-4d34-a409-5955d63b00d8",
+      "title": "范特西",
+      "country": "MY",
+      "date": "2001",
+      "release-group": {
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "first-release-date": "2001-09-20",
+        "disambiguation": "",
+        "title": "范特西",
+        "secondary-types": [],
+        "primary-type": "Album"
+      }
+    },
+    {
+      "cover-art-archive": {
+        "front": false,
+        "back": false,
+        "darkened": false,
+        "count": 0,
+        "artwork": false
+      },
+      "disambiguation": "",
+      "asin": null,
+      "barcode": null,
+      "quality": "normal",
+      "packaging": null,
+      "release-events": [
+        {
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "disambiguation": "",
+            "sort-name": "Taiwan",
+            "type": null,
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ]
+          },
+          "date": "2000-11-07"
+        }
+      ],
+      "status": "Pseudo-Release",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "title": "Jay",
+      "country": "TW",
+      "date": "2000-11-07",
+      "release-group": {
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "primary-type": "Album",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "Jay"
+      },
+      "text-representation": {
+        "script": "Hans",
+        "language": "zho"
+      },
+      "packaging-id": null,
+      "id": "8060aa5d-4e35-4e9b-89da-75dd558bcd4b"
+    },
+    {
+      "barcode": "743219207128",
+      "cover-art-archive": {
+        "front": false,
+        "back": false,
+        "darkened": false,
+        "count": 0,
+        "artwork": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "release-events": [
+        {
+          "date": "2001-12",
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "sort-name": "Taiwan",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "disambiguation": ""
+          }
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "normal",
+      "packaging": null,
+      "date": "2001-12",
+      "release-group": {
+        "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+        "secondary-type-ids": [
+          "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+        ],
+        "first-release-date": "2001-12-24",
+        "id": "c91314f2-5b6c-39b6-8fd2-74fbc4ad2477",
+        "secondary-types": [
+          "Live"
+        ],
+        "disambiguation": "",
+        "title": "Fantasy Plus",
+        "primary-type": "EP"
+      },
+      "title": "Fantasy Plus",
+      "country": "TW",
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "packaging-id": null,
+      "id": "94465cd2-b60a-3181-adea-f1032e7d5622"
+    },
+    {
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "front": true,
+        "count": 1,
+        "artwork": true,
+        "darkened": false,
+        "back": false
+      },
+      "barcode": null,
+      "packaging": null,
+      "quality": "normal",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "release-events": [
+        {
+          "area": {
+            "name": "China",
+            "id": "7c81bb69-a99b-3487-b6d4-0f76d7a29ca0",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "CN"
+            ],
+            "disambiguation": "",
+            "sort-name": "China",
+            "type": null
+          },
+          "date": "2002-07-18"
+        }
+      ],
+      "title": "八度空间",
+      "country": "CN",
+      "date": "2002-07-18",
+      "release-group": {
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "796a921e-9370-3441-a755-f6d9adb2e8dc",
+        "first-release-date": "2002-07-18",
+        "disambiguation": "",
+        "title": "八度空間",
+        "secondary-types": [],
+        "primary-type": "Album"
+      },
+      "id": "b3a5e6cf-3ce3-4877-90ae-4da323062df2",
+      "text-representation": {
+        "language": "zho",
+        "script": "Hans"
+      },
+      "packaging-id": null
+    },
+    {
+      "barcode": "743218121425",
+      "cover-art-archive": {
+        "front": true,
+        "back": true,
+        "count": 3,
+        "artwork": true,
+        "darkened": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "release-events": [
+        {
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "sort-name": "Taiwan",
+            "type-id": null,
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "TW"
+            ]
+          },
+          "date": "2000-11-07"
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "high",
+      "packaging": null,
+      "date": "2000-11-07",
+      "release-group": {
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "secondary-types": [],
+        "title": "Jay",
+        "disambiguation": "",
+        "primary-type": "Album"
+      },
+      "title": "Jay",
+      "country": "TW",
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "id": "b6acfab7-df11-3620-9152-d266e4534b36"
+    },
+    {
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "release-events": [
+        {
+          "date": "2002-04",
+          "area": {
+            "type": null,
+            "sort-name": "Europe",
+            "type-id": null,
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "XE"
+            ],
+            "name": "Europe",
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a"
+          }
+        }
+      ],
+      "packaging": null,
+      "quality": "normal",
+      "barcode": "743219334626",
+      "asin": null,
+      "disambiguation": "",
+      "cover-art-archive": {
+        "darkened": false,
+        "count": 0,
+        "artwork": false,
+        "back": false,
+        "front": false
+      },
+      "id": "d82bf795-0b1e-4ab2-9b5b-7997cf252701",
+      "text-representation": {
+        "script": "Latn",
+        "language": "mul"
+      },
+      "packaging-id": null,
+      "date": "2002-04",
+      "release-group": {
+        "primary-type": "Single",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "雙截棍",
+        "first-release-date": "2002-04",
+        "id": "e9d1657a-ccf9-35c3-b981-acfdc872eca7",
+        "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+        "secondary-type-ids": []
+      },
+      "title": "Shuang Jie Kun (Nun-Chuks)",
+      "country": "XE"
+    },
+    {
+      "text-representation": {
+        "script": "Hant",
+        "language": "zho"
+      },
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "id": "e39ef56e-ed79-4a26-b7e5-25037f9e4663",
+      "country": "HK",
+      "title": "杰倫",
+      "release-group": {
+        "disambiguation": "",
+        "title": "Jay",
+        "secondary-types": [],
+        "primary-type": "Album",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "first-release-date": "2000-11-07"
+      },
+      "date": "2000",
+      "quality": "normal",
+      "packaging": "None",
+      "release-events": [
+        {
+          "date": "2000",
+          "area": {
+            "id": "0373cdff-eac8-3fbc-92dc-36a607da06d1",
+            "iso-3166-2-codes": [
+              "CN-91"
+            ],
+            "name": "Hong Kong",
+            "type": null,
+            "sort-name": "Hong Kong",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "HK"
+            ],
+            "disambiguation": ""
+          }
+        }
+      ],
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "cover-art-archive": {
+        "count": 1,
+        "darkened": false,
+        "artwork": true,
+        "back": false,
+        "front": true
+      },
+      "asin": null,
+      "disambiguation": "",
+      "barcode": "00602458930269"
+    },
+    {
+      "release-events": [
+        {
+          "date": "2000-11-07",
+          "area": null
+        }
+      ],
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "status": "Pseudo-Release",
+      "quality": "normal",
+      "packaging": null,
+      "barcode": null,
+      "cover-art-archive": {
+        "front": false,
+        "count": 0,
+        "darkened": false,
+        "artwork": false,
+        "back": false
+      },
+      "asin": null,
+      "disambiguation": "",
+      "text-representation": {
+        "script": null,
+        "language": "zho"
+      },
+      "packaging-id": null,
+      "id": "e5633fd6-e142-4054-baa5-1a8237d83491",
+      "release-group": {
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "secondary-types": [],
+        "title": "Jay",
+        "disambiguation": "",
+        "primary-type": "Album"
+      },
+      "date": "2000-11-07",
+      "country": null,
+      "title": "Jay 周 杰倫"
+    },
+    {
+      "id": "eb820844-df23-4fed-9799-6743dbc6a42d",
+      "packaging-id": null,
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "country": "TW",
+      "title": "Fantasy",
+      "release-group": {
+        "id": "732b78cb-9f7d-383d-86cc-5cf7e43c9658",
+        "first-release-date": "2001-09-20",
+        "secondary-type-ids": [],
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "primary-type": "Album",
+        "title": "范特西",
+        "disambiguation": "",
+        "secondary-types": []
+      },
+      "date": "2001-09-20",
+      "packaging": null,
+      "quality": "normal",
+      "status-id": "41121bb9-3413-3818-8a9a-9742318349aa",
+      "status": "Pseudo-Release",
+      "release-events": [
+        {
+          "area": {
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "name": "Taiwan",
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "type": null,
+            "sort-name": "Taiwan",
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "type-id": null,
+            "disambiguation": ""
+          },
+          "date": "2001-09-20"
+        }
+      ],
+      "disambiguation": "",
+      "asin": null,
+      "cover-art-archive": {
+        "front": true,
+        "count": 1,
+        "darkened": false,
+        "artwork": true,
+        "back": false
+      },
+      "barcode": null
+    },
+    {
+      "date": "2001",
+      "release-group": {
+        "first-release-date": "2000-11-07",
+        "id": "877e9870-1b55-3153-8875-139cfe468679",
+        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+        "secondary-type-ids": [],
+        "primary-type": "Album",
+        "secondary-types": [],
+        "disambiguation": "",
+        "title": "Jay"
+      },
+      "title": "Jay",
+      "country": "TW",
+      "text-representation": {
+        "language": "zho",
+        "script": "Hant"
+      },
+      "packaging-id": null,
+      "id": "f77eee87-5d73-3a08-8637-8457cfff6053",
+      "barcode": "743218389429",
+      "cover-art-archive": {
+        "front": true,
+        "back": false,
+        "count": 1,
+        "darkened": false,
+        "artwork": true
+      },
+      "disambiguation": "",
+      "asin": null,
+      "release-events": [
+        {
+          "date": "2001",
+          "area": {
+            "name": "Taiwan",
+            "iso-3166-2-codes": [
+              "CN-71"
+            ],
+            "id": "41637cec-9a4f-389c-86d2-fc6abf3357b5",
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TW"
+            ],
+            "sort-name": "Taiwan",
+            "type": null
+          }
+        }
+      ],
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "normal",
+      "packaging": null
+    }
+  ],
+  "release-count": 265
+}
