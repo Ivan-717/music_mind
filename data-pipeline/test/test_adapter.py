@@ -73,6 +73,38 @@ def test_artist_aliases_to_musicmind():
         assert converted["locale"] == ""
 
 
+def test_artist_aliases_null_primary_becomes_false():
+    """
+    MusicBrainz 会把 primary / locale 显式返回 null。
+
+    .get("primary", False) 挡不住这种情况——
+    只在 key 缺失时用 default，key 存在但值为 null 时返回 None，
+    会导致 artist_alias.is_primary (NOT NULL) 插入失败。
+
+    实测：Various Artists 的 224 个别名里有 103 个 primary 为 null。
+    """
+
+    adapter = MusicBrainzDataAdapter()
+
+    data = {
+        "aliases": [
+            {"name": "有值", "locale": "en", "primary": True},
+            {"name": "显式 null", "locale": None, "primary": None},
+            {"name": "字段缺失"},
+        ]
+    }
+
+    result = adapter.artist_aliases_to_musicmind(data)
+
+    assert result[0]["is_primary"] is True
+    assert result[1]["is_primary"] is False
+    assert result[2]["is_primary"] is False
+
+    # locale 同理，NOT NULL DEFAULT ''
+    assert result[1]["locale"] == ""
+    assert result[2]["locale"] == ""
+
+
 def test_album_to_musicmind():
     data = load_fixture("release.json")
     release_group = data["release-group"]
@@ -235,3 +267,32 @@ def test_track_to_musicmind():
     assert result["musicbrainz_recording_id"] == recording["id"]
     assert result["name"] == recording["title"]
     assert result["duration_ms"] == recording["length"]
+
+def test_genres_to_musicmind():
+    adapter = MusicBrainzDataAdapter()
+
+    data = {
+        "genres": [
+            {
+                "id": "xxx",
+                "name": "mandopop",
+                "count": 4,
+            },
+            {
+                "id": "yyy",
+                "name": "pop",
+                "count": 2,
+            },
+        ]
+    }
+
+    result = adapter.genres_to_musicmind(data)
+
+    assert result == [
+        {"name": "mandopop", "weight": 4},
+        {"name": "pop", "weight": 2},
+    ]
+
+    # 归一化：字段缺失 / 显式 null 都返回空列表
+    assert adapter.genres_to_musicmind({}) == []
+    assert adapter.genres_to_musicmind({"genres": None}) == []

@@ -46,8 +46,11 @@ class MusicBrainzDataAdapter:
             result.append(
                 {
                     "name": alias["name"],
+                    # 注意：MusicBrainz 会把 locale / primary 显式返回 null
+                    # .get(k, default) 只在 key 缺失时用 default，
+                    # key 存在但值为 null 时返回的是 None
                     "locale": alias.get("locale") or "",
-                    "is_primary": alias.get("primary", False),
+                    "is_primary": alias.get("primary") or False,
                 }
             )
 
@@ -173,3 +176,30 @@ class MusicBrainzDataAdapter:
             "country": data.get("country"),
             "status": data.get("status"),
         }
+
+    def genres_to_musicmind(
+            self,
+            data: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        genres = data.get("genres") or []
+
+        result = []
+
+        for genre in genres:
+            name = genre.get("name")
+
+            if not name:
+                continue
+
+            count = genre.get("count")
+
+            if count is None:
+                count = 0
+
+            result.append({
+                "name": name,
+                "weight": count,
+            })
+
+        return result
+

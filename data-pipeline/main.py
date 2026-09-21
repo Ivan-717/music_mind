@@ -54,11 +54,11 @@ class ImportStats:
             "\n"
             "================ Import Summary ================\n"
             f"Artist             : {self.artist_count}\n"
-            f"ArtistAlias        : {self.artist_alias_count}\n"
-            f"Album              : {self.album_count}\n"
-            f"AlbumArtist        : {self.album_artist_count}\n"
-            f"Track              : {self.track_count}\n"
-            f"TrackArtist        : {self.track_artist_count}\n"
+            f"ArtistAlias        : {self.artist_alias_count}  (writes)\n"
+            f"Album              : {self.album_count}  (unique)\n"
+            f"AlbumArtist        : {self.album_artist_count}  (unique)\n"
+            f"Track              : {self.track_count}  (unique)\n"
+            f"TrackArtist        : {self.track_artist_count}  (unique)\n"
             f"Release processed   : {self.release_count}\n"
             f"Release filtered    : {self.filtered_release_count}\n"
             f"Release skipped     : {self.skipped_release_count}\n"
@@ -96,7 +96,7 @@ def resolve_artist(
 
         artist = client.get_artist(
             name_or_mbid,
-            inc="aliases",
+            inc="aliases+genres",
         )
 
         stats.api_request_count += 1
@@ -128,7 +128,7 @@ def resolve_artist(
 
     artist = client.get_artist(
         artist["id"],
-        inc="aliases",
+        inc="aliases+genres",
     )
 
     stats.api_request_count += 1
@@ -185,6 +185,14 @@ def import_artist(
 
     artist_ids: dict[str, int] = {}
     album_ids: dict[str, int] = {}
+    track_ids: dict[str, int] = {}
+
+    # 关系表的唯一键是 (album_id, artist_id) / (track_id, artist_id)。
+    # 一张专辑底下有多个 release，一首歌会出现在多张专辑里，
+    # 同一对 id 会被反复算出来 —— 用 set 挡掉重复写入。
+    # （不影响正确性，upsert 本来也幂等，纯粹是别白跑 SQL）
+    seen_album_artists: set[tuple[int, int]] = set()
+    seen_track_artists: set[tuple[int, int]] = set()
 
     # ========================================================
     # ① 解析 Artist
@@ -252,16 +260,16 @@ def import_artist(
 
     print()
     print("=" * 60)
-    print("③ Browse Artist Releases")
+    print("③ Browse + 过滤 Artist Releases")
     print("=" * 60)
 
     offset = 0
 
-    releases = []
-
-    
+    filtered_releases: list[dict] = []
 
     seen_release_mbids: set[str] = set()
+
+    total_count = None
 
     while True:
 
@@ -278,10 +286,16 @@ def import_artist(
             []
         )
 
+        total_count = result.get(
+            "release-count",
+            total_count,
+        )
+
         print(
             f"Browse offset={offset} "
             f"本页={len(page_releases)} "
-            f"总数={result.get('release-count')}"
+            f"总数={total_count} "
+            f"已选={len(filtered_releases)}"
         )
 
         for release in page_releases:
@@ -298,9 +312,59 @@ def import_artist(
                 release_mbid
             )
 
-            releases.append(
+            # ------------------------------------------------
+            # 边翻页边过滤
+            # 每页自带 status / release-group，无需额外请求
+            # ------------------------------------------------
+
+            status = release.get("status")
+
+            release_group = release.get(
+                "release-group"
+            ) or {}
+
+            primary_type = release_group.get(
+                "primary-type"
+            )
+
+            if (
+                statuses is not None
+                and status not in statuses
+            ):
+                stats.filtered_release_count += 1
+                continue
+
+            if (
+                primary_types is not None
+                and primary_type not in primary_types
+            ):
+                stats.filtered_release_count += 1
+                continue
+
+            filtered_releases.append(
                 release
             )
+
+            if (
+                max_releases is not None
+                and len(filtered_releases)
+                >= max_releases
+            ):
+                break
+
+        # 已经够数，不必再翻页
+        # （超大艺人靠这个提前终止，否则要翻几十上百页）
+        if (
+            max_releases is not None
+            and len(filtered_releases)
+            >= max_releases
+        ):
+
+            print(
+                f"已达 max_releases={max_releases}，"
+                f"停止翻页"
+            )
+            break
 
         # 本页不足 page_size
         # 说明已经到最后一页
@@ -310,58 +374,8 @@ def import_artist(
         offset += page_size
 
     print(
-        f"发现 Release：{len(releases)}"
-    )
-
-    # ========================================================
-    # ④ 内存过滤
-    # ========================================================
-
-    print()
-    print("=" * 60)
-    print("④ 过滤 Release")
-    print("=" * 60)
-
-    filtered_releases = []
-
-    for release in releases:
-
-        status = release.get("status")
-
-        release_group = release.get(
-            "release-group"
-        ) or {}
-
-        primary_type = release_group.get(
-            "primary-type"
-        )
-
-        if (
-            statuses is not None
-            and status not in statuses
-        ):
-            stats.filtered_release_count += 1
-            continue
-
-        if (
-            primary_types is not None
-            and primary_type not in primary_types
-        ):
-            stats.filtered_release_count += 1
-            continue
-
-        filtered_releases.append(
-            release
-        )
-
-    if max_releases is not None:
-        filtered_releases = (
-            filtered_releases[:max_releases]
-        )
-
-    print(
-        f"最终处理 Release："
-        f"{len(filtered_releases)}"
+        f"浏览 {len(seen_release_mbids)} 个，"
+        f"选出 {len(filtered_releases)} 个"
     )
 
     # ========================================================
@@ -476,6 +490,14 @@ def import_artist(
                         credit_mbid
                     ] = related_artist_id
 
+                pair = (album_id, related_artist_id)
+
+                # 同一专辑的另一个 release 会算出同一对 id
+                if pair in seen_album_artists:
+                    continue
+
+                seen_album_artists.add(pair)
+
                 album_artist_repository.upsert(
                     album_id=album_id,
                     artist_id=related_artist_id,
@@ -540,20 +562,32 @@ def import_artist(
                     # Track
                     # ----------------------------------------
 
-                    track_data = (
-                        adapter.track_to_musicmind(
-                            track
-                        )
+                    track_id = track_ids.get(
+                        recording_mbid
                     )
 
-                    track_id = (
-                        track_repository.upsert(
-                            track_data,
-                            autocommit=False,
-                        )
-                    )
+                    # 只在缓存未命中时 upsert
+                    # stats.track_count 统计的是「新增行数」
+                    if track_id is None:
 
-                    stats.track_count += 1
+                        track_data = (
+                            adapter.track_to_musicmind(
+                                track
+                            )
+                        )
+
+                        track_id = (
+                            track_repository.upsert(
+                                track_data,
+                                autocommit=False,
+                            )
+                        )
+
+                        track_ids[
+                            recording_mbid
+                        ] = track_id
+
+                        stats.track_count += 1
 
                     # ----------------------------------------
                     # Track Artist
@@ -595,6 +629,14 @@ def import_artist(
                                 credit_mbid
                             ] = related_artist_id
 
+                        pair = (track_id, related_artist_id)
+
+                        # 同一首歌出现在多张专辑里，会算出同一对 id
+                        if pair in seen_track_artists:
+                            continue
+
+                        seen_track_artists.add(pair)
+
                         track_artist_repository.upsert(
                             track_id=track_id,
                             artist_id=related_artist_id,
@@ -627,21 +669,28 @@ def import_artist(
 
             connection.commit()
 
-            stats.release_count += 1
-
-            print(
-                f"  ✓ Release 完成"
-            )
-
         except Exception as e:
 
             connection.rollback()
 
             stats.skipped_release_count += 1
 
+            # 这个 print 自己也可能抛异常（输出重定向时
+            # Windows 用 GBK 编码，编不出 ✓ / ✗），
+            # 所以它必须在 except 里，不能让它误伤成功路径
             print(
                 f"  ✗ Release 失败：{e}"
             )
+
+            continue
+
+        # 成功路径的打印放在 try 外面：
+        # print 抛异常不应该被当成「写库失败」
+        stats.release_count += 1
+
+        print(
+            f"  ✓ Release 完成"
+        )
 
         # 每 50 个打印一次进度
         if index % 50 == 0:
@@ -657,6 +706,91 @@ def import_artist(
 
 
 # ============================================================
+# 批量导入
+# ============================================================
+
+def import_artists(
+    names: list[str],
+    **kwargs,
+) -> dict[str, ImportStats]:
+    """
+    批量导入多个艺人。
+
+    单个艺人失败不会中断整批——
+    管道本身是幂等的，失败的艺人直接重跑即可。
+    """
+
+    results: dict[str, ImportStats] = {}
+    failed: list[str] = []
+
+    for index, name in enumerate(names, start=1):
+
+        print()
+        print("#" * 60)
+        print(
+            f"# [{index}/{len(names)}] {name}"
+        )
+        print("#" * 60)
+
+        try:
+
+            results[name] = import_artist(
+                name,
+                **kwargs,
+            )
+
+        except Exception as e:
+
+            print(f"  ✗ 艺人导入失败：{e}")
+
+            failed.append(name)
+
+    print_batch_summary(results, failed)
+
+    return results
+
+
+def print_batch_summary(
+    results: dict[str, ImportStats],
+    failed: list[str],
+) -> None:
+
+    print()
+    print("=" * 60)
+    print("批量导入汇总")
+    print("=" * 60)
+
+    total_api = 0
+    total_elapsed = 0.0
+
+    for name, stats in results.items():
+
+        total_api += stats.api_request_count
+        total_elapsed += stats.elapsed()
+
+        print(
+            f"  ✓ {name:26.26} "
+            f"album {stats.album_count:4}  "
+            f"release {stats.release_count:4}  "
+            f"track {stats.track_count:5}  "
+            f"api {stats.api_request_count:4}"
+        )
+
+    for name in failed:
+        print(f"  ✗ {name}")
+
+    print("-" * 60)
+    print(
+        f"  成功 {len(results)} / 失败 {len(failed)}"
+    )
+    print(
+        f"  总 API 请求 {total_api}，"
+        f"累计耗时 {total_elapsed:.1f}s"
+    )
+    print("=" * 60)
+
+
+# ============================================================
 # CLI
 # ============================================================
 
@@ -667,8 +801,9 @@ def main():
     )
 
     parser.add_argument(
-        "artist",
-        help="Artist 名称或者 MusicBrainz Artist MBID",
+        "artists",
+        nargs="+",
+        help="一个或多个 Artist 名称 / MusicBrainz Artist MBID",
     )
 
     parser.add_argument(
@@ -709,17 +844,30 @@ def main():
     if not args.no_status_filter:
         statuses = {"Official"}
 
-    stats = import_artist(
-        args.artist,
+    common = dict(
         statuses=statuses,
-        primary_types=set(
-            args.primary_types
-        ),
+        primary_types=set(args.primary_types),
         page_size=args.page_size,
         max_releases=args.max_releases,
     )
 
-    print(stats)
+    # 单个艺人：打印详细统计
+    if len(args.artists) == 1:
+
+        print(
+            import_artist(
+                args.artists[0],
+                **common,
+            )
+        )
+
+    # 多个艺人：打印批量汇总
+    else:
+
+        import_artists(
+            args.artists,
+            **common,
+        )
 
 
 if __name__ == "__main__":
