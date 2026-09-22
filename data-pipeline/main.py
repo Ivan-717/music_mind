@@ -18,7 +18,7 @@ from musicbrainz.repository import (
     ReleaseRepository,
     TrackRepository,
     TrackArtistRepository,
-    ReleaseTrackRepository,
+    ReleaseTrackRepository, GenreRepository, ArtistGenreRepository, AlbumGenreRepository,
 )
 
 
@@ -31,9 +31,11 @@ class ImportStats:
 
     artist_count: int = 0
     artist_alias_count: int = 0
+    artist_genre_count: int = 0
 
     album_count: int = 0
     album_artist_count: int = 0
+    album_genre_count: int = 0
 
     track_count: int = 0
     track_artist_count: int = 0
@@ -55,8 +57,10 @@ class ImportStats:
             "================ Import Summary ================\n"
             f"Artist             : {self.artist_count}\n"
             f"ArtistAlias        : {self.artist_alias_count}  (writes)\n"
+            f"ArtistGenre        : {self.artist_genre_count}  (unique)\n"
             f"Album              : {self.album_count}  (unique)\n"
             f"AlbumArtist        : {self.album_artist_count}  (unique)\n"
+            f"AlbumGenre         : {self.album_genre_count}  (unique)\n"
             f"Track              : {self.track_count}  (unique)\n"
             f"TrackArtist        : {self.track_artist_count}  (unique)\n"
             f"Release processed   : {self.release_count}\n"
@@ -179,6 +183,10 @@ def import_artist(
     release_repository = ReleaseRepository(connection)
     release_track_repository = ReleaseTrackRepository(connection)
 
+    genre_repository = GenreRepository(connection)
+    artist_genre_repository = ArtistGenreRepository(connection)
+    album_genre_repository = AlbumGenreRepository(connection)
+
     # ========================================================
     # 本次导入生命周期内的缓存
     # ========================================================
@@ -193,6 +201,7 @@ def import_artist(
     # （不影响正确性，upsert 本来也幂等，纯粹是别白跑 SQL）
     seen_album_artists: set[tuple[int, int]] = set()
     seen_track_artists: set[tuple[int, int]] = set()
+    seen_album_genres: set[tuple[int, int]] = set()
 
     # ========================================================
     # ① 解析 Artist
@@ -244,6 +253,23 @@ def import_artist(
         )
 
         stats.artist_alias_count += 1
+
+    genres = adapter.genres_to_musicmind(artist_data)
+
+    for genre in genres:
+        genre_id = genre_repository.upsert(
+            genre["name"],
+            autocommit=False,
+        )
+
+        artist_genre_repository.upsert(
+            artist_id=artist_id,
+            genre_id=genre_id,
+            weight=genre["weight"],
+            autocommit=False,
+        )
+
+        stats.artist_genre_count += 1
 
     # Artist 本体完成后立即提交
     connection.commit()
@@ -511,6 +537,35 @@ def import_artist(
                 stats.album_artist_count += 1
 
             # ------------------------------------------------
+            # Album Genre
+            # ------------------------------------------------
+
+            genres = adapter.genres_to_musicmind(release_group)
+
+            for genre in genres:
+                genre_id = genre_repository.upsert(
+                    genre["name"],
+                    autocommit=False,
+                )
+
+                pair = (album_id, genre_id)
+
+                # 同一专辑的另一个 release 会算出同一对 id
+                if pair in seen_album_genres:
+                    continue
+
+                seen_album_genres.add(pair)
+
+                album_genre_repository.upsert(
+                    album_id=album_id,
+                    genre_id=genre_id,
+                    weight=genre["weight"],
+                    autocommit=False,
+                )
+
+                stats.album_genre_count += 1
+
+            # ------------------------------------------------
             # Release
             # ------------------------------------------------
 
@@ -773,6 +828,8 @@ def print_batch_summary(
             f"album {stats.album_count:4}  "
             f"release {stats.release_count:4}  "
             f"track {stats.track_count:5}  "
+            f"genre {stats.artist_genre_count:3}"
+            f"/{stats.album_genre_count:3}  "
             f"api {stats.api_request_count:4}"
         )
 

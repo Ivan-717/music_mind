@@ -6,3 +6,6 @@ from .artist_alias_repository import ArtistAliasRepository
 from .album_artist_repository import AlbumArtistRepository
 from .track_artist_repository import TrackArtistRepository
 from .release_track_repository import ReleaseTrackRepository
+from .genre_repository import GenreRepository
+from .artist_genre_repository import ArtistGenreRepository
+from .album_genre_repository import AlbumGenreRepository

@@ -1,0 +1,20 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: musicmind-backend
+  config:
+    # 复用 Python 侧那份 .env（仓库根目录）。
+    # 这里刻意不加 optional: ，文件找不到就启动失败 —— 否则密码会静默变成
+    # 空字符串，你只会在 MySQL 那边收到一个没头没尾的 Access denied。
+    import: file:../.env[.properties]
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:musicmind}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
