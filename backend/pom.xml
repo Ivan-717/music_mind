@@ -20,6 +20,12 @@
             <version>3.5.13</version>
         </dependency>
 
+<!--        spring security自动解析请求头里的JWT，校验签名和过期时间-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -73,6 +79,10 @@
                     <source>17</source>
                     <target>17</target>
                     <encoding>UTF-8</encoding>
+                    <!-- 保留方法参数名，Spring MVC 的 @PathVariable/@RequestParam
+                         靠反射取名字。用 spring-boot-starter-parent 时它默认是开的，
+                         本项目用 dependencyManagement 导入 BOM，拿不到父 POM 的默认值。 -->
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <plugin>

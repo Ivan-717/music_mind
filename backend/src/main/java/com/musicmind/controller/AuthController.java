@@ -1,7 +1,10 @@
 package com.musicmind.controller;
 
+import com.musicmind.dto.LoginRequest;
 import com.musicmind.dto.RegisterRequest;
+import com.musicmind.security.CurrentUser;
 import com.musicmind.service.AuthService;
+import com.musicmind.vo.TokenVO;
 import com.musicmind.vo.UserVO;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -22,5 +25,16 @@ public class AuthController {
     public UserVO register(@Valid @RequestBody RegisterRequest req) {
         return authService.register(req);
     }
+
+    @PostMapping("/login")
+    public TokenVO login(@Valid @RequestBody LoginRequest req) {
+        return authService.login(req);
+    }
+
+    @GetMapping("/me")
+    public UserVO me() {
+        return authService.me(CurrentUser.id());
+    }
+
 }
 

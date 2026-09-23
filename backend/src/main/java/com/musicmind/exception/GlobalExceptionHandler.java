@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,12 +54,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(new ApiError(409, message, null));
     }
 
+    // ②-bis 外键约束失败：引用了不存在的记录
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("外键约束失败: {}", ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError(404, "引用的资源不存在", null));
+    }
+
     // ③ 自定义业务异常 → 用它自带的状态码
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex) {
         return ResponseEntity.status(ex.getStatus())
                 .body(new ApiError(ex.getStatus(), ex.getMessage(), null));
     }
+
+    // ③-bis 认证失败 → 401（文案必须完全一致，防用户名枚举）
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex) {
+        log.warn("登录失败: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiError(401, "用户名或密码错误", null));
+    }
+
 
     // ④ 兜底 → 500
     @ExceptionHandler(Exception.class)
