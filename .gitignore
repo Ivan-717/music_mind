@@ -25,6 +25,11 @@ htmlcov/
 target/
 !.mvn/wrapper/maven-wrapper.jar
 
+# ===== Node / 前端 =====
+node_modules/
+dist/
+*.local
+
 # ===== IDE =====
 .idea/
 .vscode/
