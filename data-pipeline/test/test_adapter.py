@@ -239,21 +239,6 @@ def test_release_to_musicmind():
     assert result["status"] == data.get("status")
 
 
-def test_release_tracks_to_musicmind():
-    data = load_fixture("release.json")
-
-    adapter = MusicBrainzDataAdapter()
-    result = adapter.release_tracks_to_musicmind(data)
-
-    assert len(result) == 10
-
-    for item in result:
-        assert item["release_musicbrainz_id"] == data["id"]
-        assert item["track_musicbrainz_recording_id"]
-        assert item["track_number"] is not None
-        assert item["disc_number"] is not None
-
-
 def test_track_to_musicmind():
     data = load_fixture("release.json")
 

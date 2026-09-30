@@ -204,20 +204,6 @@ class MusicBrainzClient:
             },
         )
 
-    def get_release_group(
-        self,
-        release_group_mbid: str,
-    ) -> dict[str, Any]:
-        """
-        获取 Release Group 详情。
-        """
-        return self.get(
-            f"/release-group/{release_group_mbid}",
-            params={
-                "inc": "artist-credits",
-            },
-        )
-
     def get_recording(
         self,
         recording_mbid: str,

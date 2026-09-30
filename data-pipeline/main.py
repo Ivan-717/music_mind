@@ -10,15 +10,13 @@ from config.settings import MUSICBRAINZ_CONFIG
 from database.connection import get_connection
 from musicbrainz import MusicBrainzClient
 from musicbrainz.adapter import MusicBrainzDataAdapter
+
+# release 级的写库逻辑和按需入库（ingest_release.py）共用这一段
+from musicbrainz.ingest import build_release_ingest_context, ingest_release
+
 from musicbrainz.repository import (
-    ArtistRepository,
     ArtistAliasRepository,
-    AlbumRepository,
-    AlbumArtistRepository,
-    ReleaseRepository,
-    TrackRepository,
-    TrackArtistRepository,
-    ReleaseTrackRepository, GenreRepository, ArtistGenreRepository, AlbumGenreRepository,
+    ArtistGenreRepository,
 )
 
 
@@ -171,37 +169,13 @@ def import_artist(
     # Repository
     # ========================================================
 
-    artist_repository = ArtistRepository(connection)
+    # artist 的别名和流派只有整艺人导入才写（按需入库不解析 artist），留在本地
     artist_alias_repository = ArtistAliasRepository(connection)
-
-    album_repository = AlbumRepository(connection)
-    album_artist_repository = AlbumArtistRepository(connection)
-
-    track_repository = TrackRepository(connection)
-    track_artist_repository = TrackArtistRepository(connection)
-
-    release_repository = ReleaseRepository(connection)
-    release_track_repository = ReleaseTrackRepository(connection)
-
-    genre_repository = GenreRepository(connection)
     artist_genre_repository = ArtistGenreRepository(connection)
-    album_genre_repository = AlbumGenreRepository(connection)
 
-    # ========================================================
-    # 本次导入生命周期内的缓存
-    # ========================================================
-
-    artist_ids: dict[str, int] = {}
-    album_ids: dict[str, int] = {}
-    track_ids: dict[str, int] = {}
-
-    # 关系表的唯一键是 (album_id, artist_id) / (track_id, artist_id)。
-    # 一张专辑底下有多个 release，一首歌会出现在多张专辑里，
-    # 同一对 id 会被反复算出来 —— 用 set 挡掉重复写入。
-    # （不影响正确性，upsert 本来也幂等，纯粹是别白跑 SQL）
-    seen_album_artists: set[tuple[int, int]] = set()
-    seen_track_artists: set[tuple[int, int]] = set()
-    seen_album_genres: set[tuple[int, int]] = set()
+    # Release 级（album / track / release 及关系表）的仓库 + id 缓存 + seen set
+    # 全在 ctx 里，和 ingest_release.py 共用同一段代码
+    ctx = build_release_ingest_context(connection)
 
     # ========================================================
     # ① 解析 Artist
@@ -232,11 +206,11 @@ def import_artist(
         artist_data
     )
 
-    artist_id = artist_repository.upsert(
+    artist_id = ctx.artist_repository.upsert(
         artist
     )
 
-    artist_ids[artist["musicbrainz_id"]] = artist_id
+    ctx.artist_ids[artist["musicbrainz_id"]] = artist_id
 
     stats.artist_count += 1
 
@@ -257,7 +231,7 @@ def import_artist(
     genres = adapter.genres_to_musicmind(artist_data)
 
     for genre in genres:
-        genre_id = genre_repository.upsert(
+        genre_id = ctx.genre_repository.upsert(
             genre["name"],
             autocommit=False,
         )
@@ -424,299 +398,17 @@ def import_artist(
 
         try:
 
-            # ------------------------------------------------
-            # 获取 Release 详情
-            # ------------------------------------------------
-
-            data = client.get_release(
-                release_mbid
-            )
-
-            stats.api_request_count += 1
-
-            # ------------------------------------------------
-            # Release Group → Album
-            # ------------------------------------------------
-
-            release_group = data.get(
-                "release-group"
-            )
-
-            if not release_group:
-                print(
-                    "  跳过：没有 Release Group"
-                )
-
-                stats.skipped_release_count += 1
-                continue
-
-            album = adapter.album_to_musicmind(
-                release_group
-            )
-
-            album_mbid = album[
-                "musicbrainz_id"
-            ]
-
-            # Album 缓存
-            album_id = album_ids.get(
-                album_mbid
-            )
-
-            if album_id is None:
-
-                album_id = album_repository.upsert(
-                    album,
-                    autocommit=False,
-                )
-
-                album_ids[
-                    album_mbid
-                ] = album_id
-
-                stats.album_count += 1
-
-            # ------------------------------------------------
-            # Album Artist
-            # ------------------------------------------------
-
-            album_artists = (
-                adapter.album_artists_to_musicmind(
-                    release_group
-                )
-            )
-
-            for credit in album_artists:
-
-                credit_mbid = credit[
-                    "artist_musicbrainz_id"
-                ]
-
-                credited_name = credit.get(
-                    "credited_name"
-                )
-
-                # 先从本次导入缓存找
-                related_artist_id = artist_ids.get(
-                    credit_mbid
-                )
-
-                # 没有则创建 stub
-                if related_artist_id is None:
-
-                    related_artist_id = (
-                        artist_repository.ensure_stub(
-                            musicbrainz_id=credit_mbid,
-                            name=credited_name,
-                            autocommit=False,
-                        )
-                    )
-
-                    artist_ids[
-                        credit_mbid
-                    ] = related_artist_id
-
-                pair = (album_id, related_artist_id)
-
-                # 同一专辑的另一个 release 会算出同一对 id
-                if pair in seen_album_artists:
-                    continue
-
-                seen_album_artists.add(pair)
-
-                album_artist_repository.upsert(
-                    album_id=album_id,
-                    artist_id=related_artist_id,
-                    credited_name=credited_name,
-                    join_phrase=credit.get(
-                        "join_phrase"
-                    ),
-                    autocommit=False,
-                )
-
-                stats.album_artist_count += 1
-
-            # ------------------------------------------------
-            # Album Genre
-            # ------------------------------------------------
-
-            genres = adapter.genres_to_musicmind(release_group)
-
-            for genre in genres:
-                genre_id = genre_repository.upsert(
-                    genre["name"],
-                    autocommit=False,
-                )
-
-                pair = (album_id, genre_id)
-
-                # 同一专辑的另一个 release 会算出同一对 id
-                if pair in seen_album_genres:
-                    continue
-
-                seen_album_genres.add(pair)
-
-                album_genre_repository.upsert(
-                    album_id=album_id,
-                    genre_id=genre_id,
-                    weight=genre["weight"],
-                    autocommit=False,
-                )
-
-                stats.album_genre_count += 1
-
-            # ------------------------------------------------
-            # Release
-            # ------------------------------------------------
-
-            release = adapter.release_to_musicmind(
-                data
-            )
-
-            # MBID 换成本地 id
-            release["album_id"] = album_ids[
-                release.pop("album_musicbrainz_id")
-            ]
-
-            release_id = release_repository.upsert(
-                release,
-                autocommit=False,
-            )
-
-            # ------------------------------------------------
-            # Track
-            # ------------------------------------------------
-
-            for media in data.get(
-                "media",
-                [],
+            if not ingest_release(
+                connection,
+                client,
+                adapter,
+                ctx,
+                release_mbid,
+                stats,
             ):
-
-                disc_number = (
-                    media.get("position")
-                    or 1
-                )
-
-                for track in media.get(
-                    "tracks",
-                    []
-                ):
-
-                    recording = track.get(
-                        "recording"
-                    ) or {}
-
-                    recording_mbid = recording.get(
-                        "id"
-                    )
-
-                    if not recording_mbid:
-                        continue
-
-                    # ----------------------------------------
-                    # Track
-                    # ----------------------------------------
-
-                    track_id = track_ids.get(
-                        recording_mbid
-                    )
-
-                    # 只在缓存未命中时 upsert
-                    # stats.track_count 统计的是「新增行数」
-                    if track_id is None:
-
-                        track_data = (
-                            adapter.track_to_musicmind(
-                                track
-                            )
-                        )
-
-                        track_id = (
-                            track_repository.upsert(
-                                track_data,
-                                autocommit=False,
-                            )
-                        )
-
-                        track_ids[
-                            recording_mbid
-                        ] = track_id
-
-                        stats.track_count += 1
-
-                    # ----------------------------------------
-                    # Track Artist
-                    # ----------------------------------------
-
-                    track_artists = (
-                        adapter.track_artists_to_musicmind(
-                            recording
-                        )
-                    )
-
-                    for credit in track_artists:
-
-                        credit_mbid = credit[
-                            "artist_musicbrainz_id"
-                        ]
-
-                        credited_name = credit.get(
-                            "credited_name"
-                        )
-
-                        related_artist_id = (
-                            artist_ids.get(
-                                credit_mbid
-                            )
-                        )
-
-                        if related_artist_id is None:
-
-                            related_artist_id = (
-                                artist_repository.ensure_stub(
-                                    musicbrainz_id=credit_mbid,
-                                    name=credited_name,
-                                    autocommit=False,
-                                )
-                            )
-
-                            artist_ids[
-                                credit_mbid
-                            ] = related_artist_id
-
-                        pair = (track_id, related_artist_id)
-
-                        # 同一首歌出现在多张专辑里，会算出同一对 id
-                        if pair in seen_track_artists:
-                            continue
-
-                        seen_track_artists.add(pair)
-
-                        track_artist_repository.upsert(
-                            track_id=track_id,
-                            artist_id=related_artist_id,
-                            credited_name=credited_name,
-                            join_phrase=credit.get(
-                                "join_phrase"
-                            ),
-                            autocommit=False,
-                        )
-
-                        stats.track_artist_count += 1
-
-                    # ----------------------------------------
-                    # Release Track
-                    # ----------------------------------------
-
-                    release_track_repository.upsert(
-                        release_id=release_id,
-                        track_id=track_id,
-                        track_number=track.get(
-                            "position"
-                        ),
-                        disc_number=disc_number,
-                        autocommit=False,
-                    )
+                # 没有 Release Group。skip 计数已经在函数里加过，
+                # 而且一个字节都没写过，直接跳过，不需要 rollback
+                continue
 
             # ------------------------------------------------
             # 一个 Release 完成
@@ -727,6 +419,12 @@ def import_artist(
         except Exception as e:
 
             connection.rollback()
+
+            # 【回滚不回退缓存】缓存里存的是 upsert 当场返回的自增 id，
+            # 而 MySQL 的自增值不会后退 —— 不清的话，同一个 release-group 的
+            # 下一个 release 会复用这个已经不存在的 id，撞外键错，
+            # 并且一路错到本次导入结束
+            ctx.forget_uncommitted()
 
             stats.skipped_release_count += 1
 

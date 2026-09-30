@@ -130,36 +130,6 @@ class MusicBrainzDataAdapter:
 
         return result
 
-    def release_tracks_to_musicmind(
-            self,
-            data: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        release_musicbrainz_id = data["id"]
-
-        result = []
-
-        for media in data.get("media", []):
-            disc_number = media.get("position")
-
-            for track in media.get("tracks", []):
-                recording = track.get("recording", {})
-
-                recording_id = recording.get("id")
-
-                if not recording_id:
-                    continue
-
-                result.append(
-                    {
-                        "release_musicbrainz_id": release_musicbrainz_id,
-                        "track_musicbrainz_recording_id": recording_id,
-                        "track_number": track.get("position"),
-                        "disc_number": disc_number,
-                    }
-                )
-
-        return result
-
     def release_to_musicmind(
             self,
             data: dict[str, Any],
