@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiLogin, apiMe } from '@/api/auth'
+import { apiLogin } from '@/api/auth'
 
 const TOKEN_KEY = 'mm_token'
 
@@ -27,9 +27,5 @@ export const useUserStore = defineStore('user', () => {
     user.value = data.user
   }
 
-  async function fetchMe() {
-    user.value = await apiMe()
-  }
-
-  return { token, user, login, setToken, clear, fetchMe }
+  return { token, user, login, setToken, clear }
 })

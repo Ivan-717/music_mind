@@ -14,3 +14,15 @@ export const apiFavorite = (trackId) =>
 
 // 当前用户全部收藏的 trackId，用于判断「这首歌是否已收藏」
 export const apiFavoriteIds = () => http.get('/favorites/ids')
+
+/**
+ * 批量加入收藏。trackIds 是【本地 track 表的 id】，一次最多 500。
+ * 返回 { changed, unknown }——unknown 是本地库里没有的 id（已跳过），
+ * 正常情况应该是 0，不为 0 说明传了脏 id。
+ */
+export const apiFavoriteBatch = (trackIds) =>
+  http.post('/favorites/batch', { trackIds })
+
+/** 批量取消收藏。同样返回 { changed, unknown } */
+export const apiUnfavoriteBatch = (trackIds) =>
+  http.post('/favorites/batch/remove', { trackIds })

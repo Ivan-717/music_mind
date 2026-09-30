@@ -1,6 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { apiFavoritePage, apiUnfavorite } from '@/api/favorite'
+import { useDisplay } from '@/composables/useDisplay'
+import CoverImage from '@/components/CoverImage.vue'
+
+const { fmt, fmtDuration } = useDisplay()
 
 const items = ref([])
 const total = ref(0)
@@ -49,12 +53,6 @@ function go(p) {
   load()
 }
 
-function fmtDuration(ms) {
-  if (ms == null) return '--:--'
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
 // 后端返回 LocalDateTime，形如 2026-09-28T17:43:57
 function fmtTime(t) {
   return t ? String(t).replace('T', ' ').slice(0, 16) : ''
@@ -73,19 +71,23 @@ onMounted(load)
   <template v-else>
     <ul class="fav-list">
       <li v-for="it in items" :key="it.trackId">
-        <div class="row">
-          <span class="name">{{ it.name }}</span>
-          <span class="artist">{{ it.artistNames }}</span>
-        </div>
-        <div class="row meta">
-          <span class="album">{{ it.albumName || '—' }}</span>
-          <span class="dur">{{ fmtDuration(it.durationMs) }}</span>
-          <span class="time">{{ fmtTime(it.favoritedAt) }}</span>
-          <button :disabled="busyId === it.trackId" @click="remove(it.trackId)">
-            {{ busyId === it.trackId ? '…' : '取消收藏' }}
-          </button>
+        <CoverImage :album-id="it.albumId" :size="44" :alt="fmt(it.albumName)" />
+        <div class="body">
+          <div class="row">
+            <span class="name">{{ fmt(it.name) }}</span>
+            <span class="artist">{{ fmt(it.artistNames) }}</span>
+          </div>
+          <div class="row meta">
+            <span class="album">{{ fmt(it.albumName) || '—' }}</span>
+            <span class="dur">{{ fmtDuration(it.durationMs) }}</span>
+            <span class="time">{{ fmtTime(it.favoritedAt) }}</span>
+            <button :disabled="busyId === it.trackId" @click="remove(it.trackId)">
+              {{ busyId === it.trackId ? '…' : '取消收藏' }}
+            </button>
+          </div>
         </div>
       </li>
+
     </ul>
 
     <div class="pager">

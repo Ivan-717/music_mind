@@ -24,6 +24,26 @@ const routes = [
     name: 'album-detail',
     component: () => import('@/views/AlbumDetailView.vue')
   },
+    {
+    path: '/search',
+    name: 'search',
+    component: () => import('@/views/SearchView.vue')
+  },
+    {
+    path: '/artists/:id',
+    name: 'artist-detail',
+    component: () => import('@/views/ArtistView.vue')
+  },
+    {
+    path: '/import',
+    name: 'import',
+    component: () => import('@/views/ImportView.vue')
+  },
+    {
+    path: '/my-playlist',
+    name: 'my-playlist',
+    component: () => import('@/views/MyPlaylistView.vue')
+  },
 
   { path: '/:pathMatch(.*)*', redirect: '/albums' }
 ]

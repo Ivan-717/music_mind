@@ -17,12 +17,17 @@ nav .who { color: #888; margin-left: auto; }
 main { max-width: 900px; margin: 0 auto; padding: 24px; }
 
 ul { list-style: none; padding: 0; }
-li {
+
+.album-list li {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid #f0f0f0;
 }
+
+.album-list .name { flex: 1; }
+
 .artist { color: #888; font-size: 14px; }
 
 .login-box { max-width: 320px; margin: 80px auto; text-align: center; }
@@ -30,7 +35,9 @@ li {
 .login-box input, .login-box button { padding: 10px; font-size: 15px; }
 .err { color: #d33; }
 
-.fav-list li { display: block; padding: 12px 0; }
+.fav-list li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
+.fav-list .body { flex: 1; min-width: 0; }   /* min-width:0 防止长文本把 flex 撑爆 */
+
 .fav-list .row { display: flex; align-items: center; gap: 12px; }
 .fav-list .meta { margin-top: 6px; font-size: 13px; color: #888; }
 .fav-list .meta .album { flex: 1; }
@@ -39,9 +46,9 @@ li {
 .pager { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
 .empty { color: #999; text-align: center; padding: 40px 0; }
 
-.album-head h2 { margin: 0 0 6px; }
+
 .album-meta { display: flex; align-items: center; gap: 12px;
-              margin: 0 0 18px; color: #666; font-size: 14px; }
+              margin: 0 ; color: #666; font-size: 14px; }
 .album-meta .tag { background: #eef; color: #446;
                    padding: 1px 8px; border-radius: 10px; font-size: 12px; }
 
@@ -59,3 +66,292 @@ li {
 .track-list .fav { border: none; background: none; cursor: pointer;
                    font-size: 18px; color: #ccc; padding: 0 4px; }
 .track-list .fav.on { color: #e8a33d; }
+
+.album-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+.album-head-text { min-width: 0; }
+.album-head-text h2 { margin: 0 0 6px; }
+
+.nav-search {
+  flex: 1;
+  max-width: 300px;
+  padding: 4px 10px;
+  font-size: 13px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.search-section { margin-top: 24px; }
+
+.variants { margin: 0; color: #aaa; font-size: 12px; }
+
+.artist-list li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; }
+.artist-list .name { font-size: 15px; }
+.disambig { color: #aaa; font-size: 12px; }
+
+/* ===== 歌手页 ===== */
+.artist-head { margin-bottom: 20px; }
+.artist-head h2 { margin: 0 0 6px; }
+.artist-meta { display: flex; gap: 14px; margin: 0 0 8px; color: #666; font-size: 14px; }
+.artist-head .disambig { margin: 0 0 8px; color: #999; font-size: 13px; }
+
+.alias-line, .genre-line {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 6px; margin: 0 0 6px; color: #666; font-size: 13px;
+}
+.alias-line .label, .genre-line .label { color: #aaa; margin-right: 4px; }
+
+.section-title { margin: 26px 0 4px; font-size: 15px; color: #444; }
+.section-title .count { color: #bbb; font-weight: normal; font-size: 13px; }
+
+/* 歌手页专辑行右侧的元信息 */
+.album-list .meta {
+  display: flex; align-items: center; gap: 10px;
+  flex: none; color: #888; font-size: 13px;
+}
+.album-list .meta .tag {
+  background: #eef; color: #446; padding: 1px 8px;
+  border-radius: 10px; font-size: 12px;
+}
+
+/* 搜索结果里的歌手链接 */
+.artist-list a.name { color: #3a6ea5; text-decoration: none; font-size: 15px; }
+.artist-list a.name:hover { text-decoration: underline; }
+
+/* 结果被 limit 截断时的提示 */
+.more-hint { margin: 8px 0 0; color: #aaa; font-size: 12px; }
+
+/* ===== 搜索结果分块 tab ===== */
+.search-tabs,
+.status-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 18px 0 0;
+  border-bottom: 1px solid #eee;
+}
+.status-tabs { margin: 4px 0 12px; }
+/* 状态筛选右侧的补充说明（识别中的数量），不参与点击 */
+.status-tabs .tab-note { margin-left: 10px; font-size: 12px; }
+.search-tabs button,
+.status-tabs button {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #777;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.search-tabs button:hover,
+.status-tabs button:hover { color: #222; }
+.search-tabs button.active,
+.status-tabs button.active {
+  color: #222;
+  font-weight: 600;
+  border-bottom-color: #3a6ea5;
+}
+.search-tabs .count,
+.status-tabs .count { color: #aaa; font-weight: normal; font-size: 12px; }
+
+/* ===== 本地搜不到时的 MusicBrainz 查询结果 ===== */
+.no-result .empty { padding: 24px 0 8px; }
+
+.lookup-box {
+  margin-top: 12px; padding: 14px 16px;
+  border: 1px solid #e6e6e6; border-radius: 6px; background: #fafafa;
+}
+.lookup-title { margin: 0 0 8px; font-size: 13px; color: #666; }
+.lookup-list { padding: 0; margin: 0; }
+.lookup-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid #eee;
+}
+.lookup-list li:last-child { border-bottom: none; }
+.lookup-list .name { font-size: 15px; }
+.lookup-list .meta { display: flex; align-items: center; gap: 6px; flex: 1; }
+.lookup-list .tag {
+  background: #eef; color: #446; padding: 1px 8px;
+  border-radius: 10px; font-size: 12px;
+}
+.lookup-list .state { font-size: 12px; }
+.lookup-list .state-ok { color: #3a8a4a; }
+.lookup-list .state-todo { color: #c98a2e; }
+
+.lookup-tip { margin: 10px 0 0; color: #888; font-size: 12px; }
+.lookup-tip code {
+  background: #eee; padding: 1px 6px; border-radius: 3px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.more-hint a { color: #3a6ea5; text-decoration: none; }
+.more-hint a:hover { text-decoration: underline; }
+
+/* ===== 导入歌单 ===== */
+.hint { color: #777; font-size: 13px; margin: 0 0 16px; }
+.hint strong { color: #444; }
+
+.import-box { display: flex; gap: 8px; margin-bottom: 16px; }
+.import-url {
+  flex: 1; padding: 8px 12px; font-size: 14px;
+  border: 1px solid #ddd; border-radius: 4px;
+}
+.import-box button {
+  padding: 8px 20px; font-size: 14px; cursor: pointer;
+  border: 1px solid #3a6ea5; background: #3a6ea5; color: #fff; border-radius: 4px;
+}
+.import-box button:disabled { background: #ccc; border-color: #ccc; cursor: default; }
+
+.import-summary {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline;
+  margin: 0 0 18px; font-size: 14px;
+}
+.import-summary .ok { color: #2f7d4f; }
+.import-summary .muted { color: #999; font-size: 13px; }
+.import-summary .gap { color: #b8860b; }
+
+.import-sub { margin: 18px 0 6px; font-size: 14px; color: #444; }
+
+.album-link { color: #888; font-size: 13px; text-decoration: none; }
+.album-link:hover { text-decoration: underline; }
+.track-list .state { color: #aaa; font-size: 12px; }
+
+/* 次要文字。通用类——「我的歌单」页在 .import-summary 之外也用它 */
+.muted { color: #999; font-size: 13px; }
+
+/* ===== 我的歌单（导入后的完整列表） ===== */
+.playlist-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
+.playlist-tabs .tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; font-size: 13px; cursor: pointer;
+  border: 1px solid #e0e0e0; background: #fafafa; color: #555; border-radius: 16px;
+}
+.playlist-tabs .tab:hover { border-color: #c8c8c8; }
+.playlist-tabs .tab.active {
+  border-color: #3a6ea5; background: #eef3fa; color: #2c5580;
+}
+.playlist-tabs .tab-count { color: #aaa; font-size: 12px; }
+.playlist-tabs .tab.active .tab-count { color: #7a9dc4; }
+
+.my-track-list li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 0; border-bottom: 1px solid #f4f4f4; font-size: 14px;
+}
+/* min-width:0 让长歌名可以被压缩，不然会把右边的列挤出去 */
+.my-track-list .name { flex: 1; min-width: 0; }
+.my-track-list .no { width: 34px; text-align: right; color: #bbb; font-size: 12px; }
+.my-track-list .artist { color: #888; font-size: 13px; width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-track-list .album { color: #aaa; font-size: 13px; width: 170px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.my-track-list .dur { width: 46px; text-align: right; color: #999; font-size: 13px; }
+
+.my-track-list .cover {
+  width: 44px; height: 44px; border-radius: 3px; object-fit: cover; flex: none;
+  background: #f2f2f2;
+}
+/* 平台没给封面时的占位块，保持行高一致 */
+.my-track-list .cover.placeholder { display: inline-block; }
+
+.my-track-list .state {
+  width: 54px; text-align: right; font-size: 12px; flex: none;
+}
+.my-track-list .state.matched { color: #2f7d4f; }
+.my-track-list .state.pending { color: #b8860b; }
+.my-track-list .state.unresolved { color: #bbb; }
+
+.page-info { color: #888; font-size: 13px; }
+
+/* ===== 我的歌单：操作条 / 勾选 / 删歌单 ===== */
+.playlist-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.playlist-head .section-title { margin-bottom: 4px; }
+.playlist-actions { display: flex; gap: 8px; flex: none; }
+.playlist-actions button {
+  padding: 4px 12px; font-size: 13px; cursor: pointer;
+  border-radius: 4px; border: 1px solid #ddd; background: #fafafa; color: #555;
+}
+.playlist-actions button:disabled { color: #ccc; cursor: default; border-color: #eee; }
+.playlist-actions .ghost:not(:disabled):hover { border-color: #3a6ea5; color: #3a6ea5; }
+.playlist-actions .danger { border-color: #e6b8b8; color: #b44; }
+.playlist-actions .danger:not(:disabled):hover { background: #fdf3f3; border-color: #d99; }
+
+.select-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 8px 10px; margin: 0 0 8px;
+  background: #f8f9fb; border: 1px solid #eceff4; border-radius: 4px;
+  font-size: 13px; color: #666;
+}
+.select-bar .pick-all { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.select-bar .pick-count { color: #3a6ea5; }
+.select-bar button.sm {
+  padding: 3px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+}
+.select-bar button.sm:not(:disabled):hover { background: #eef3fa; }
+.select-bar button.sm:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
+
+.my-track-list .pick { flex: none; cursor: pointer; }
+.my-track-list .pick:disabled { cursor: default; }
+.my-track-list li.picked { background: #f6f9fd; }
+
+.my-track-list .fav, .my-track-list .drop {
+  border: none; background: none; cursor: pointer; padding: 0 2px;
+  line-height: 1; color: #ccc; flex: none;
+}
+.my-track-list .fav { font-size: 15px; }
+.my-track-list .fav.on { color: #e8a33d; }
+.my-track-list .fav:disabled { color: #e8e8e8; cursor: default; }
+.my-track-list .fav:not(:disabled):hover { color: #e8a33d; }
+.my-track-list .drop { font-size: 13px; }
+.my-track-list .drop:not(:disabled):hover { color: #b44; }
+.my-track-list .drop:disabled { color: #eee; cursor: default; }
+
+/* ===== 按需入库（③）：行内按钮 / 进度面板 ===== */
+.my-track-list .ingest {
+  flex: none; padding: 2px 8px; font-size: 12px; cursor: pointer;
+  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+}
+.my-track-list .ingest:not(:disabled):hover { background: #eef3fa; }
+.my-track-list .ingest:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
+/* 抓取中用虚线边框，和「排队等你去点」区分开 */
+.my-track-list .ingest.busy { border-style: dashed; color: #b8860b; border-color: #e8d5a8; }
+
+.ingest-panel {
+  margin: 0 0 10px; padding: 8px 10px;
+  background: #f8f9fb; border: 1px solid #eceff4; border-radius: 4px;
+  font-size: 13px; color: #666;
+}
+.ingest-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ingest-row .grow { flex: 1; }
+.ingest-now { color: #3a6ea5; max-width: 420px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+/* 小圆点：跑着是绿的，暂停是灰的 */
+.ingest-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: #2f7d4f; animation: ingest-pulse 1.4s ease-in-out infinite;
+}
+.ingest-dot.paused { background: #bbb; animation: none; }
+@keyframes ingest-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.ingest-note { margin: 6px 0 0; }
+.ingest-fails { list-style: none; margin: 6px 0 0; padding: 0; }
+.ingest-fails li { display: flex; gap: 8px; padding: 1px 0; font-size: 12px; color: #999; }
+.ingest-fails .name { color: #777; }
+.ingest-fails .why { color: #b44; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 420px; }
+
+/* 面板里的小按钮。.select-bar button.sm 是另一套，那个只在勾选条里生效 */
+.ingest-panel button.sm {
+  padding: 3px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+}
+.ingest-panel button.sm:not(:disabled):hover { background: #eef3fa; }
+.ingest-panel button.sm:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
+
+.notice { color: #2f7d4f; font-size: 13px; }
+.fav-opt {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #666; margin: 0 0 16px; cursor: pointer;
+}

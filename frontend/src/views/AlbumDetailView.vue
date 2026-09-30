@@ -3,6 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiAlbumDetail, apiAlbumTracks } from '@/api/album'
 import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
+import { useDisplay } from '@/composables/useDisplay'
+import CoverImage from '@/components/CoverImage.vue'
+
+const { fmt, fmtDuration } = useDisplay()
 
 const route = useRoute()
 const albumId = route.params.id
@@ -56,12 +60,6 @@ async function toggleFav(trackId) {
   }
 }
 
-function fmtDuration(ms) {
-  if (ms == null) return '--:--'
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
 onMounted(async () => {
   try {
     album.value = await apiAlbumDetail(albumId)
@@ -85,25 +83,29 @@ onMounted(async () => {
 
   <template v-else>
     <div class="album-head">
-      <h2>{{ album.name }}</h2>
-      <p class="album-meta">
-        <span>{{ album.artistNames }}</span>
-        <span v-if="album.releaseDate">{{ album.releaseDate }}</span>
-        <span v-if="album.primaryType" class="tag">{{ album.primaryType }}</span>
-      </p>
+      <CoverImage :album-id="album.id" :size="150" :alt="fmt(album.name)" />
+      <div class="album-head-text">
+        <h2>{{ fmt(album.name) }}</h2>
+        <p class="album-meta">
+          <span>{{ fmt(album.artistNames) }}</span>
+          <span v-if="album.releaseDate">{{ album.releaseDate }}</span>
+          <span v-if="album.primaryType" class="tag">{{ album.primaryType }}</span>
+        </p>
+      </div>
     </div>
+
 
     <!-- 多个版本才显示切换器 -->
     <div v-if="album.releases.length > 1" class="release-picker">
       <label for="rel">版本</label>
       <select id="rel" v-model.number="releaseId" @change="onReleaseChange">
         <option v-for="r in album.releases" :key="r.releaseId" :value="r.releaseId">
-          {{ r.title }} · {{ r.country || '??' }} · {{ r.releaseDate || '未知' }} · {{ r.trackCount }}曲
+          {{ fmt(r.title) }} · {{ r.country || '??' }} · {{ r.releaseDate || '未知' }} · {{ r.trackCount }}曲
         </option>
       </select>
     </div>
     <p v-else-if="currentRelease" class="release-single">
-      {{ currentRelease.title }} · {{ currentRelease.country || '??' }} ·
+      {{ fmt(currentRelease.title) }} · {{ currentRelease.country || '??' }} ·
       {{ currentRelease.releaseDate || '未知' }}
     </p>
 
@@ -114,8 +116,8 @@ onMounted(async () => {
     <ul v-else class="track-list">
       <li v-for="t in tracks" :key="t.trackId">
         <span class="no">{{ t.trackNumber }}</span>
-        <span class="name">{{ t.name }}</span>
-        <span class="artist">{{ t.artistNames }}</span>
+        <span class="name">{{ fmt(t.name) }}</span>
+        <span class="artist">{{ fmt(t.artistNames) }}</span>
         <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
         <button
           class="fav"
