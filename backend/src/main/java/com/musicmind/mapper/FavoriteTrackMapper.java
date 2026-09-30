@@ -28,6 +28,21 @@ public interface FavoriteTrackMapper {
     @Select("SELECT track_id FROM favorite_track WHERE user_id = #{userId}")
     List<Long> selectTrackIdsByUser(@Param("userId") Long userId);
 
+    /**
+     * 从一批 id 里挑出本地 track 表真的存在的。
+     *
+     * 批量收藏前必须先过这一道：favorite_track.track_id 有外键，
+     * 传进来一个库里没有的 id 会让整条 INSERT 报错，
+     * 结果是一批里有一半能成、一半炸掉——不如先过滤，把无效的如实报给前端。
+     */
+    @Select("""
+            <script>
+            SELECT id FROM track WHERE id IN
+            <foreach collection="ids" item="i" open="(" separator="," close=")">#{i}</foreach>
+            </script>
+            """)
+    List<Long> selectExistingTrackIds(@Param("ids") List<Long> ids);
+
     @Select("""
             SELECT t.id          AS track_id,
                    t.name        AS name,

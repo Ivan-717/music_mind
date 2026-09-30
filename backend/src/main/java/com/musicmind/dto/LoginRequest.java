@@ -1,6 +1,5 @@
 package com.musicmind.dto;
 
-import com.musicmind.vo.UserVO;
 import jakarta.validation.constraints.NotBlank;
 
 public record LoginRequest(

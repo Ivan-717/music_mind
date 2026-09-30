@@ -23,3 +23,23 @@ jwt:
   secret: ${JWT_SECRET}
   expire-minutes: ${JWT_EXPIRE_MINUTES:120}
 
+musicbrainz:
+  # User-Agent 来自 .env（上面 config.import 已把它读进来）。
+  # MusicBrainz 要求 UA 里带联系方式，给空值会被限流甚至封禁。
+  user-agent: ${MUSICBRAINZ_USER_AGENT:MusicMind/1.0 (unknown@example.com)}
+  base-url: https://musicbrainz.org/ws/2
+
+# 按需入库（③）。路径都相对 backend/——和上面 config.import 的 ../.env 同一套约定
+ingestion:
+  data-pipeline-dir: ../data-pipeline
+  # 【必须指到 .venv 里的那个 python】系统 python 没装 requests / python-dotenv，
+  # 用它起子进程会以 ModuleNotFoundError 失败，从 Java 这边只能看到一个非 0 退出码
+  python: ../data-pipeline/.venv/Scripts/python.exe
+  script: ingest_release.py
+  # 单条任务的上限。超时强杀并按失败收尾，否则一个卡死的子进程能拖住整条队列
+  job-timeout-seconds: 300
+  poll-interval-ms: 1500
+  # 子进程输出按 job id 落盘，失败时从文件尾部取原因。已在 .gitignore 里
+  log-dir: ../logs/ingestion
+  recent-jobs: 20
+
