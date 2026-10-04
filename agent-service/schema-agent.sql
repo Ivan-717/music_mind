@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS `agent_run` (
     COMMENT 'report / ask',
   `question` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'ask 模式的问题',
   `report_id` bigint unsigned DEFAULT NULL COMMENT 'ask 针对哪份报告；report 完成后回填',
+  `conversation_id` bigint unsigned DEFAULT NULL COMMENT 'chat 属于哪个会话。和 report_id 互斥',
   `provider` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
 
   -- 【这一趟要分析哪些曲目】子进程靠它重建 context。
@@ -148,19 +149,42 @@ CREATE TABLE IF NOT EXISTS `agent_run` (
   COMMENT='Agent 运行队列（单 worker 顺序消费）';
 
 -- ============================================================
--- 追问的消息
+-- 对话（自由问答的会话）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `agent_conversation` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '新的对话',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_conv_user` (`user_id`,`id`),
+  CONSTRAINT `fk_conv_user` FOREIGN KEY (`user_id`)
+    REFERENCES `app_user` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='自由问答的会话。和「针对某份报告的追问」是两条独立的线';
+
+-- ============================================================
+-- 消息（追问 + 对话共用一张表）
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `agent_message` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `report_id` bigint unsigned NOT NULL,
+  -- 【两列可空且互斥】
+  --   追问：report_id = 某份报告，content 是纯文本
+  --   对话：conversation_id = 某个会话，content 是 JSON
+  --         {"answer": "...", "recommendations": [...]}
+  -- 两种形状靠挂在哪一列上区分，读的时候按会话类型解析
+  `report_id` bigint unsigned DEFAULT NULL,
+  `conversation_id` bigint unsigned DEFAULT NULL,
   `run_id` bigint unsigned DEFAULT NULL,
   `role` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'user / assistant',
   `content` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_msg_report` (`report_id`,`id`),
+  KEY `idx_msg_conv` (`conversation_id`,`id`),
   CONSTRAINT `fk_msg_report` FOREIGN KEY (`report_id`)
     REFERENCES `agent_report` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  COMMENT='追问的消息。UI 的数据源是这张表 —— LangGraph 的 checkpoint 是库内部格式，不能当 UI 数据源';
+  COMMENT='追问和对话的消息。UI 的数据源是这张表 —— LangGraph 的 checkpoint 是库内部格式，不能当 UI 数据源';

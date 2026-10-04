@@ -224,6 +224,26 @@ def cmd_ask(args: argparse.Namespace) -> int:
     print(f"ASK_OK {args.run_id}")
     return 0
 
+def cmd_chat(args: argparse.Namespace) -> int:
+    """跑一轮对话并落库。Java 子进程调的就是这个。"""
+    from musicmind_agent.chat import chat_and_persist
+    from musicmind_agent.persist import mark_failed
+
+    connection = get_connection()
+    try:
+        chat_and_persist(connection, args.run_id)
+    except Exception as e:
+        try:
+            mark_failed(connection, args.run_id, f"{type(e).__name__}: {e}")
+        except Exception:
+            pass
+        print(f"CHAT_FAIL {args.run_id} {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    finally:
+        connection.close()
+
+    print(f"CHAT_OK {args.run_id}")
+    return 0
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="musicmind", description="MusicMind Agent 服务")
@@ -263,6 +283,10 @@ def main() -> int:
     p_ask = sub.add_parser("ask", help="对一份已生成的报告追问（Java 子进程调用）")
     p_ask.add_argument("--run-id", type=int, required=True)
     p_ask.set_defaults(func=cmd_ask)
+
+    p_chat = sub.add_parser("chat", help="跑一轮对话（Java 子进程调用）")
+    p_chat.add_argument("--run-id", type=int, required=True)
+    p_chat.set_defaults(func=cmd_chat)
 
     args = parser.parse_args()
     return args.func(args)
