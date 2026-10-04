@@ -5,9 +5,20 @@ import {
   apiMyReports, apiReportDetail,
   apiAgentStatus, apiStopAgent, apiResumeAgent
 } from '@/api/persona'
+import { apiListImports } from '@/api/import'
+import { apiFavoriteIds } from '@/api/favorite'
 import { useDisplay } from '@/composables/useDisplay'
 
 const { fmt } = useDisplay()
+
+/**
+ * 分析范围：分析哪些曲目，而不是「分析哪张歌单」。
+ *
+ * 收藏也算一个范围 —— 这个项目里导入和收藏是两件事（导入是搬一份列表来，
+ * 收藏是我对这首歌表态），所以「只看我的收藏」是个自然的诉求，
+ * 不该只能混在「全部」里。
+ */
+const MIN_ANALYZABLE = 20   // 和 agent-service 的 evidence.MIN_TRACKS 一致
 
 // 维度名和置信度的显示映射。模板里直接引用，不需要是响应式的
 const DIM_LABEL = {
@@ -22,6 +33,9 @@ const CONF_LABEL = { high: '把握较大', medium: '中等', low: '仅供参考'
 // ============================================================
 
 const provider = ref('deepseek')
+const scope = ref('all')          // 'all' | 'favorites' | 'playlist:<importId>'
+const playlists = ref([])         // 导入的歌单，带 matchedCount
+const favCount = ref(null)        // 收藏曲目数。拿不到就是 null，不显示计数
 const reports = ref([])
 const report = ref(null)          // { report: {...}, messages: [...] }
 const runId = ref(null)
@@ -31,7 +45,6 @@ const agentStatus = ref(null)
 const loading = ref(true)
 const busy = ref(false)           // 有请求在飞，锁住按钮
 const error = ref('')
-const notice = ref('')
 
 // 最近一次生成失败的原因。**必须单独存一份** —— 失败时 tick() 会去
 // loadReports()，那里的 openReport 会把 run 清成 null，说明跟着一起没了
@@ -40,14 +53,20 @@ const lastFailure = ref('')
 const question = ref('')
 const asking = ref(false)
 
-/** 生成已经跑了多少秒。30 秒的空白页是留不住用户的，必须给个数 */
+/** 生成已经跑了多少秒。几十秒的空白页是留不住用户的，必须给个数 */
 const elapsed = ref(0)
+
+/**
+ * 预估总时长（进度条的分母）。**以后端返回的为准** ——
+ * 原来两边各写一个（前端 30、后端 40），进度条的口径和文案对不上。
+ * 后端 AgentService.ESTIMATE_SECONDS 是唯一来源，这里只是它还没到时的占位值
+ */
+const estimateSeconds = ref(30)
 
 let pollTimer = null
 let tickTimer = null
 
 const POLL_MS = 3000
-const ESTIMATE_SECONDS = 30
 
 // 【轮询失败不能一次就停】见 tick() 的说明。5 次 × 3 秒 = 15 秒：
 // 够跨过一次网络抖动，又不至于对着已经挂掉的后端一直打下去
@@ -81,15 +100,97 @@ const messages = computed(() => report.value?.messages || [])
 
 /** 进度：已跑秒数 / 估计秒数。估计值只是给个参照，超了也不报错 */
 const progress = computed(() =>
-  Math.min(100, Math.round((elapsed.value / ESTIMATE_SECONDS) * 100))
+  Math.min(100, Math.round((elapsed.value / estimateSeconds.value) * 100))
 )
 
-/** 队列里这条还在跑吗。**必须写在 script setup 里** ——
- * 写到 options 的 computed 里是读不到 run 这个 ref 的（不同作用域），
- * 那种错误不会报错，只是永远返回 undefined，按钮就不会禁用 */
+/** 队列里这条还在跑吗。
+ *
+ * 【必须写在 script setup 里】写到 options 的 computed 里是读不到 run 这个 ref 的
+ * （不同作用域），那种错误不会报错，只是永远返回 undefined，按钮就不会禁用。
+ *
+ * 【pollStopped 时必须算「没在跑」】轮询都断了，run.status 就永远停在
+ * QUEUED/RUNNING 上不动了 —— 这时候还把它当依据，按钮会永久禁用，
+ * 正是这次要修的那个「卡死在分析中」的症状。断线时把控制权还给用户，
+ * 由「重新连接」那块说明情况。 */
 const isRunning = computed(
-  () => run.value?.status === 'QUEUED' || run.value?.status === 'RUNNING'
+  () => !pollStopped.value &&
+    (run.value?.status === 'QUEUED' || run.value?.status === 'RUNNING')
 )
+
+// ============================================================
+// 分析范围
+// ============================================================
+
+/**
+ * 下拉选项。**能显示计数的都显示** —— 两个数差得很远是常态，
+ * 814 首的「我喜欢的音乐」只有 427 首能分析（其余还没进本地库）。
+ * 不显示的话用户点一张 0/76 的歌单，只会得到一句「数据不足」。
+ */
+const scopeOptions = computed(() => {
+  const out = [
+    { value: 'all', label: '全部（收藏 + 所有歌单）', disabled: false },
+    {
+      value: 'favorites',
+      label: favCount.value == null ? '我的收藏' : `我的收藏（${favCount.value} 首）`,
+      disabled: false
+    }
+  ]
+  for (const p of playlists.value) {
+    const n = p.matchedCount ?? 0
+    out.push({
+      value: `playlist:${p.id}`,
+      label: `${p.playlistName}（${n} / ${p.trackCount} 首可分析）`,
+      // 低于门槛的一定会走「数据不足」分支。置灰比让用户白等一趟好，
+      // 但也只是提示 —— 后端才是真正说了算的那一方
+      disabled: n < MIN_ANALYZABLE
+    })
+  }
+  return out
+})
+
+function parseScope(value) {
+  if (value.startsWith('playlist:')) {
+    return { scopeKind: 'playlist', scopeRef: Number(value.slice('playlist:'.length)) }
+  }
+  return { scopeKind: value, scopeRef: null }
+}
+
+/** 正在跑的那一趟分析的是什么范围。进度面板上用 */
+const runningScopeLabel = computed(() => {
+  const kind = run.value?.scopeKind
+  if (!kind) return ''
+  if (kind === 'playlist') {
+    const p = playlists.value.find((x) => x.id === run.value?.scopeRef)
+    return p ? p.playlistName : '某张歌单'
+  }
+  return kind === 'favorites' ? '我的收藏' : '全部'
+})
+
+/** 已生成那份报告的范围名。**来自报告快照**，不是从当前选择推的 ——
+ *  用户看完报告可能已经改了下拉 */
+const reportScopeLabel = computed(() => report.value?.report?.scope_label || '')
+
+/** 一份报告对应的下拉值。用于打开历史报告时把下拉切过去 */
+function scopeValueOf(rep) {
+  if (!rep) return 'all'
+  if (rep.scope_kind === 'playlist' && rep.scope_ref != null) return `playlist:${rep.scope_ref}`
+  return rep.scope_kind || 'all'
+}
+
+async function loadScopeOptions() {
+  // 【两个请求各自 try】拉不到歌单不该让整个页面打不开，
+  // 大不了下拉里只剩「全部」和「我的收藏」
+  try {
+    playlists.value = await apiListImports()
+  } catch (e) {
+    playlists.value = []
+  }
+  try {
+    favCount.value = (await apiFavoriteIds()).length
+  } catch (e) {
+    favCount.value = null
+  }
+}
 
 // ============================================================
 // 加载
@@ -115,6 +216,11 @@ async function openReport(id) {
     report.value = await apiReportDetail(id)
     runId.value = null
     run.value = null
+    // 【下拉跟着切到这份报告的范围】不切的话会出现「下拉写着『全部』、
+    // 正文写着『分析范围 · 热歌榜』」—— 用户只会以为自己选错了。
+    // 歌单已被删时那个选项不存在，就不动它（正文仍然显示快照里的名字）
+    const v = scopeValueOf(report.value?.report)
+    if (scopeOptions.value.some((o) => o.value === v)) scope.value = v
   } catch (e) {
     error.value = e.response?.data?.message || e.message
   }
@@ -128,13 +234,22 @@ async function generate() {
   if (busy.value) return
   busy.value = true
   error.value = ''
-  notice.value = ''
   lastFailure.value = ''
   report.value = null
   elapsed.value = 0
   try {
-    const r = await apiRequestReport(provider.value)
+    const { scopeKind, scopeRef } = parseScope(scope.value)
+    const r = await apiRequestReport(provider.value, scopeKind, scopeRef)
     runId.value = r.runId
+    if (r.estimateSeconds) estimateSeconds.value = r.estimateSeconds
+    // 【先摆一条「排队中」的 run】从 runId 落值到第一次 tick 返回之间，
+    // isRunning 还是 false —— 按钮短暂可点，连点两下会排两次 30 秒的 LLM 任务。
+    // busy 挡不住：它在 finally 里就放开了，而 run 要等轮询回来才填上。
+    //
+    // 顺带解决另一个问题：进度条原来要等第一次轮询回来（约 3 秒）才出现，
+    // 那几秒用户以为按钮没反应
+    run.value = { id: r.runId, kind: 'report', status: 'QUEUED',
+                  scopeKind, scopeRef, question: null }
     startPoll()
   } catch (e) {
     error.value = e.response?.data?.message || e.message
@@ -208,10 +323,13 @@ async function ask() {
   asking.value = true
   error.value = ''
   try {
-    const r = await apiAsk(report.value.report.id, q)
+    const rep = report.value.report
+    const r = await apiAsk(rep.id, q)
     question.value = ''
-    // 追问也要排队，用同一个轮询
+    // 追问也要排队，用同一个轮询。同样先摆一条，进度条不用等第一次轮询
     runId.value = r.runId
+    run.value = { id: r.runId, kind: 'ask', status: 'QUEUED', question: q,
+                  scopeKind: rep.scope_kind, scopeRef: rep.scope_ref }
     startPoll()
   } catch (e) {
     error.value = e.response?.data?.message || e.message
@@ -232,7 +350,13 @@ async function resumeQueue() {
   finally { busy.value = false }
 }
 
-onMounted(loadReports)
+onMounted(async () => {
+  // 【必须先 await 选项】loadReports 会顺手打开最新那份报告，
+  // 而打开时要拿 scopeOptions 判断「该不该把下拉切过去」——
+  // 两个并行的话选项还没到，那个判断静默失效
+  await loadScopeOptions()
+  loadReports()
+})
 </script>
 
 <template>
@@ -240,11 +364,21 @@ onMounted(loadReports)
 
   <p class="muted">
     基于你的收藏和歌单，分析口味并推荐本地库里你还没听过的歌。
-    <strong>要跑 30 秒左右</strong>，期间可以离开这个页面。
+    <!-- 不写死秒数：进度条的分母来自后端，文案里再写一个数就会出现
+         「文案说 30 秒、进度条按 40 秒走」这种对不上的情况 -->
+    <strong>要跑半分钟左右</strong>，期间可以离开这个页面。
   </p>
 
   <div class="persona-bar">
-    <select v-model="provider" :disabled="busy">
+    <select v-model="scope" class="scope-select" :disabled="busy || isRunning">
+      <option
+        v-for="o in scopeOptions"
+        :key="o.value"
+        :value="o.value"
+        :disabled="o.disabled"
+      >{{ o.label }}</option>
+    </select>
+    <select v-model="provider" :disabled="busy || isRunning">
       <option value="deepseek">DeepSeek</option>
       <option value="qwen">通义千问</option>
     </select>
@@ -255,7 +389,6 @@ onMounted(loadReports)
   </div>
 
   <p v-if="error" class="err">{{ error }}</p>
-  <p v-if="notice" class="notice">{{ notice }}</p>
 
   <!-- 断线。**不能只是停表就完事** —— 停表之后 run 还停在 RUNNING，
        按钮会永久禁用，用户没有任何恢复的入口 -->
@@ -271,9 +404,9 @@ onMounted(loadReports)
   <div v-else-if="isRunning" class="persona-progress">
     <div class="bar"><span :style="{ width: progress + '%' }"></span></div>
     <p class="muted">
-      正在分析… {{ elapsed }} 秒
+      正在分析{{ runningScopeLabel ? '：' + runningScopeLabel : '…' }}
       <template v-if="run?.question">（回答追问）</template>
-      · {{ agentStatus?.currentLabel || '排队中' }}
+      · {{ elapsed }} 秒
     </p>
     <button class="ghost sm" :disabled="busy" @click="stopQueue">停止</button>
   </div>
@@ -296,8 +429,20 @@ onMounted(loadReports)
   </p>
 
   <template v-else-if="body">
+    <!-- 这份是基于哪批歌生成的。**用报告里的快照**，不是当前下拉的值 ——
+         用户看完一份报告可能已经把下拉改了，显示当前值会张冠李戴 -->
+    <p v-if="reportScopeLabel" class="scope-note">
+      分析范围 · {{ reportScopeLabel }}
+    </p>
+
     <h3 class="section-title">{{ fmt(body.headline?.title) }}</h3>
     <p class="muted">{{ fmt(body.headline?.subtitle) }}</p>
+
+    <!-- 名字的依据。**这行是代码渲染的，不是模型写的** —— 名字是创作，
+         它打哪儿来是事实。两个来源分开，名字就没法顺手把依据也编了 -->
+    <p v-if="body.persona_basis" class="persona-basis">
+      依据 · {{ body.persona_basis }}
+    </p>
 
     <p v-if="report?.report?.status === 'degraded'" class="err">
       这份报告是降级版本：模型两次重写后仍有无法核实的内容，叙事部分被丢弃。

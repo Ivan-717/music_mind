@@ -54,6 +54,12 @@ let pollTimer = null
 /** 轮询间隔。一次入库 6~7 秒，3 秒的粒度足够，也不会把接口刷爆 */
 const POLL_MS = 3000
 
+// 【轮询失败不能一次就停】见 refreshStatus 的说明。
+// 5 次 × 3 秒 = 15 秒：够跨过一次网络抖动，又不至于对着挂掉的后端一直打
+const POLL_MAX_FAILURES = 5
+let pollFailures = 0
+const pollStopped = ref(false)   // 放弃轮询了，等用户点「重新连接」
+
 /** 队列里还活着吗。没有活动任务就该停表，别让页面开着一直空转 */
 const hasActiveJob = computed(() =>
   !!ingestion.value &&
@@ -312,9 +318,20 @@ function hideBroken(e) {
 async function refreshStatus() {
   try {
     ingestion.value = await apiIngestionStatus()
+    pollFailures = 0
+    return true
   } catch (e) {
-    // 状态查不到不该打断页面。停表，等下一次操作再启动
-    stopPoll()
+    // 【一次抖动不能停表】原来这里直接 stopPoll() —— 而 ingestion 还停在
+    // 最后一次成功的样子，hasActiveJob 恒真，于是那一行永远显示「抓取中」，
+    // ♡ 和入库按钮永久禁用，没有报错、也没有恢复入口，只能刷新页面。
+    //
+    // 改成连续失败才停。停下来时必须让用户看得见（见模板里的 pollStopped 块）
+    pollFailures += 1
+    if (pollFailures >= POLL_MAX_FAILURES) {
+      stopPoll()
+      pollStopped.value = true
+    }
+    return false
   }
 }
 
@@ -347,7 +364,7 @@ async function refreshPageSilently() {
 
 async function tick() {
   const before = JSON.stringify(ingestion.value?.activeTrackRowIds || [])
-  await refreshStatus()
+  const ok = await refreshStatus()
 
   const after = JSON.stringify(ingestion.value?.activeTrackRowIds || [])
   // 有行刚从「抓取中」变成别的状态 → 重取当前页，让 ♡ 和状态文字跟上
@@ -355,13 +372,18 @@ async function tick() {
     await refreshPageSilently()
   }
 
-  if (!hasActiveJob.value) {
+  // 【只有真拿到过状态，才有资格判断「队列空了」】没查到就停表的话，
+  // 排队后那一次失败会让进度永远不出现 —— 用户以为点了没反应。
+  // 连续失败那条路走 refreshStatus 里的计数，不在这儿停
+  if (ok && !hasActiveJob.value) {
     stopPoll()
   }
 }
 
 function startPoll() {
   if (pollTimer) return
+  pollFailures = 0
+  pollStopped.value = false
   tick()
   pollTimer = setInterval(tick, POLL_MS)
 }
@@ -526,6 +548,20 @@ watch(currentId, (id) => {
         >批量入库 ({{ pageData.unresolvedCount }})</button>
         <button class="ghost" :disabled="working" @click="favoriteAll">全部加入收藏</button>
         <button class="danger" :disabled="working" @click="deletePlaylist">删除歌单</button>
+      </div>
+    </div>
+
+    <!-- 和服务器失去联系。**必须单独一块** —— 下面那块面板的判断依赖
+         ingestion，而这条恰恰是「ingestion 已经不可信了」的时候。
+         不说的话页面看起来一切正常，只是永远不更新 -->
+    <div v-if="pollStopped" class="ingest-panel">
+      <div class="ingest-row">
+        <span class="ingest-dot paused"></span>
+        <span class="grow err">
+          和服务器失去联系了（连着 {{ POLL_MAX_FAILURES }} 次没连上）。
+          进度可能不是最新的，但抓取在后台照常跑。
+        </span>
+        <button class="ghost sm" @click="startPoll">重新连接</button>
       </div>
     </div>
 

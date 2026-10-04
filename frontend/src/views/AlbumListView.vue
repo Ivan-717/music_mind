@@ -12,7 +12,11 @@ const loading = ref(true)
 
 onMounted(async () => {
   try {
-    albums.value = await apiAlbums()      // 拦截器已经吐过 data 了
+    // 年份在这里切一次，不在模板里对同一行调两遍 slice
+    albums.value = (await apiAlbums()).map((a) => ({   // 拦截器已经吐过 data 了
+      ...a,
+      year: a.releaseDate ? String(a.releaseDate).slice(0, 4) : ''
+    }))
   } catch (e) {
     error.value = e.response?.data?.message || e.message
   } finally {
@@ -22,15 +26,27 @@ onMounted(async () => {
 </script>
 
 <template>
-  <p v-if="loading">加载中…</p>
+  <div class="album-grid-head">
+    <h2>专辑</h2>
+    <span v-if="!loading && !error" class="muted">{{ albums.length }} 张</span>
+  </div>
+
+  <p v-if="loading" class="muted">加载中…</p>
   <p v-else-if="error" class="err">{{ error }}</p>
-  <ul v-else class="album-list">
+
+  <!--
+    网格而不是列表：封面是这一页唯一有信息量的东西，列表里的 56px 缩略图
+    等于把 471 张封面压成一列小方块，既看不清也翻不完。
+  -->
+  <ul v-else class="album-grid">
     <li v-for="a in albums" :key="a.id">
-      <CoverImage :album-id="a.id" :size="56" :alt="fmt(a.name)" />
-      <RouterLink class="name" :to="`/albums/${a.id}`">{{ fmt(a.name) }}</RouterLink>
-      <span class="artist">{{ fmt(a.artistNames) }}</span>
+      <RouterLink class="card" :to="`/albums/${a.id}`">
+        <CoverImage :album-id="a.id" fill :alt="fmt(a.name)" />
+        <span class="card-name">{{ fmt(a.name) }}</span>
+        <span class="card-sub">
+          {{ fmt(a.artistNames) }}<template v-if="a.year"> · {{ a.year }}</template>
+        </span>
+      </RouterLink>
     </li>
   </ul>
-
-
 </template>

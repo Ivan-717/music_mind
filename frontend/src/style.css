@@ -1,124 +1,279 @@
+/* ============================================================
+   MusicMind — 深夜听歌
+
+   设计三条：**精简**（少边框，靠留白和层级分块）、
+   **温暖**（不用冷灰和纯黑，底色带一点棕和紫）、
+   **emo**（暗底、低饱和的陶土与玫瑰紫、标题走衬线）。
+
+   【为什么整套换成变量】原来颜色散在 60 多个规则里，改一处要全文找。
+   集中之后「换个色系」是一个 :root 的事。
+   ============================================================ */
+
+:root {
+  /* 底。暖调的近黑，不是 #000 —— 纯黑配白字是「终端」，不是「夜晚」 */
+  --bg:        #16131a;
+  --bg-soft:   #1d1922;   /* 面板 / 卡片 */
+  --bg-lift:   #262030;   /* 悬浮 / 选中 */
+  --line:      #2e2836;   /* 分隔线 */
+  --line-soft: #241f2b;   /* 更弱的分隔（表格行） */
+
+  --text:      #e8e2e6;   /* 暖白，不是 #fff */
+  --dim:       #a79ead;
+  --mute:      #6f6779;
+
+  --accent:    #d98e73;   /* 陶土暖桃：链接、主按钮 */
+  --accent-bg: #3a2823;   /* accent 的低饱和底 */
+  --plum:      #b08aa8;   /* 玫瑰紫：次要强调、推断标记 */
+  --plum-bg:   #2e2433;
+  --sage:      #8fae7a;   /* 已收录 / 成功 */
+  --sage-bg:   #232c21;
+  --amber:     #d4a86a;   /* 待处理 */
+  --amber-bg:  #302819;
+  --rose:      #c97b7b;   /* 错误 */
+
+  --radius:    8px;
+  --radius-sm: 5px;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-  color: #222;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  /* 两团极淡的光。纯平底色太「面板」，一点渐变就有空间感 —— 但要不察觉得到 */
+  background-image:
+    radial-gradient(900px 500px at 15% -10%, rgba(217, 142, 115, .07), transparent 70%),
+    radial-gradient(700px 400px at 90% 0%, rgba(176, 138, 168, .06), transparent 70%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
 header {
-  border-bottom: 1px solid #e5e5e5;
-  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 24px;
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(22, 19, 26, .88);
+  backdrop-filter: blur(10px);
 }
 
-nav { display: flex; align-items: center; gap: 16px; }
-nav .who { color: #888; margin-left: auto; }
+nav { display: flex; align-items: center; gap: 18px; }
+nav a { color: var(--dim); text-decoration: none; font-size: 14px; }
+nav a:hover:not(.router-link-active) { color: var(--text); }
+/* 当前所在页只换颜色，不加边框和底色 —— 顶部有五个入口，加重了就变成一排按钮 */
+nav a.router-link-active { color: var(--accent); }
+nav .who { color: var(--mute); margin-left: auto; font-size: 13px; }
 
-main { max-width: 900px; margin: 0 auto; padding: 24px; }
+/* 繁简切换 / 退出。不写就会用浏览器默认样式 —— 暗底上一个白块，很扎眼 */
+nav button {
+  padding: 4px 12px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-soft); color: var(--dim);
+}
+nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+main { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+/* 专辑页放宽。封面网格在 900px 里只能排五列，150px 一张太挤；
+   文字页则要保持窄 —— 行宽超过 90 个字符就不好读了 */
+main.wide { max-width: 1240px; }
 
 ul { list-style: none; padding: 0; }
+
+h1, h2, h3 { font-weight: 600; letter-spacing: .01em; }
+/* 衬线只给标题。全站走衬线会变得像读书网站，只用在标题上才是「文艺」 */
+h2 { font-family: Georgia, "Songti SC", "SimSun", serif; font-weight: 500; }
+
+a { color: var(--accent); }
+
+/* ===== 通用小件 ===== */
+
+.muted { color: var(--mute); font-size: 13px; }
+.empty { color: var(--mute); text-align: center; padding: 56px 0; }
+.err { color: var(--rose); font-size: 13px; }
+.notice { color: var(--sage); font-size: 13px; }
+
+button {
+  font-family: inherit;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+input::placeholder { color: var(--mute); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-lift);
+}
+
+img { background: var(--bg-soft); }
+
+/* ===== 首页：专辑网格 =====
+   封面是这一页唯一有信息量的东西，所以它占满格子、歌名和艺人只做一行注解。
+   列表形态的问题不是丑，是「封面在 56px 上什么也看不出来」 */
+
+.album-grid-head {
+  display: flex; align-items: baseline; gap: 10px; margin: 0 0 22px;
+}
+.album-grid-head h2 { margin: 0; }
+
+.album-grid {
+  display: grid;
+  /* auto-fill + minmax：窗口多宽就排多少列，不用写断点。
+     150px 是能看清封面细节的下限 */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 26px 20px;
+  padding: 0; margin: 0; list-style: none;
+}
+
+.album-grid .card {
+  display: flex; flex-direction: column; gap: 9px;
+  text-decoration: none; color: inherit;
+}
+
+/* 选择器要比组件里的 .cover[data-v-x] 更具体，否则那条属性顺序飘一下就失效 */
+.album-grid .card > .cover {
+  border-radius: 8px;
+  box-shadow: 0 1px 10px rgba(0, 0, 0, .4);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.album-grid .card:hover > .cover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .55);
+}
+
+.album-grid .card-name {
+  font-size: 13.5px; line-height: 1.35; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.album-grid .card:hover .card-name { color: var(--accent); }
+.album-grid .card-sub {
+  font-size: 12px; color: var(--mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ===== 专辑列表（歌手页 / 搜索结果还在用）===== */
 
 .album-list li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .album-list .name { flex: 1; }
 
-.artist { color: #888; font-size: 14px; }
+.artist { color: var(--dim); font-size: 13px; }
 
-.login-box { max-width: 320px; margin: 80px auto; text-align: center; }
+.album-meta { display: flex; align-items: center; gap: 12px;
+              margin: 0 ; color: var(--dim); font-size: 13px; }
+.album-meta .tag { background: var(--plum-bg); color: var(--plum);
+                   padding: 1px 9px; border-radius: 10px; font-size: 12px; }
+
+/* ===== 登录 ===== */
+
+.login-box { max-width: 300px; margin: 100px auto; text-align: center; }
 .login-box form { display: flex; flex-direction: column; gap: 10px; }
-.login-box input, .login-box button { padding: 10px; font-size: 15px; }
-.err { color: #d33; }
+.login-box input, .login-box button { padding: 11px; font-size: 15px; }
+.login-box button {
+  background: var(--accent); color: #1b1512; border: none;
+  border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
+}
+.login-box button:hover { background: #e39a7f; }
 
-.fav-list li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
+/* ===== 收藏 ===== */
+
+.fav-list li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0;
+               border-bottom: 1px solid var(--line-soft); }
 .fav-list .body { flex: 1; min-width: 0; }   /* min-width:0 防止长文本把 flex 撑爆 */
 
 .fav-list .row { display: flex; align-items: center; gap: 12px; }
-.fav-list .meta { margin-top: 6px; font-size: 13px; color: #888; }
+.fav-list .meta { margin-top: 6px; font-size: 13px; color: var(--mute); }
 .fav-list .meta .album { flex: 1; }
-.fav-list button { padding: 4px 10px; font-size: 13px; }
+.fav-list button { padding: 4px 12px; font-size: 13px; }
 
-.pager { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
-.empty { color: #999; text-align: center; padding: 40px 0; }
+.pager { display: flex; align-items: center; gap: 16px; margin-top: 24px; }
+.page-info { color: var(--mute); font-size: 13px; }
 
+/* ===== 专辑详情 ===== */
 
-.album-meta { display: flex; align-items: center; gap: 12px;
-              margin: 0 ; color: #666; font-size: 14px; }
-.album-meta .tag { background: #eef; color: #446;
-                   padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+.album-head { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
+.album-head-text { min-width: 0; }
+.album-head-text h2 { margin: 0 0 6px; }
 
-.release-picker { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.release-picker select { flex: 1; max-width: 560px; padding: 6px 8px; }
-.release-single { margin: 0 0 14px; color: #888; font-size: 13px; }
+.release-picker { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.release-picker select { flex: 1; max-width: 560px; padding: 7px 10px; }
+.release-single { margin: 0 0 16px; color: var(--mute); font-size: 13px; }
 
 .track-list { padding: 0; }
 .track-list li { display: flex; align-items: center; gap: 12px;
-                 padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-.track-list .no { width: 28px; text-align: right; color: #aaa; font-size: 13px; }
+                 padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.track-list .no { width: 28px; text-align: right; color: var(--mute); font-size: 13px; }
 .track-list .name { flex: 1; }
-.track-list .artist { color: #888; font-size: 13px; }
-.track-list .dur { width: 46px; text-align: right; color: #888; font-size: 13px; }
+.track-list .artist { color: var(--dim); font-size: 13px; }
+.track-list .dur { width: 46px; text-align: right; color: var(--mute); font-size: 13px; }
 .track-list .fav { border: none; background: none; cursor: pointer;
-                   font-size: 18px; color: #ccc; padding: 0 4px; }
-.track-list .fav.on { color: #e8a33d; }
-
-.album-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
-.album-head-text { min-width: 0; }
-.album-head-text h2 { margin: 0 0 6px; }
+                   font-size: 18px; color: var(--line); padding: 0 4px; }
+.track-list .fav.on { color: var(--amber); }
 
 .nav-search {
   flex: 1;
   max-width: 300px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 13px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
 }
 
-.search-section { margin-top: 24px; }
+.search-section { margin-top: 28px; }
 
-.variants { margin: 0; color: #aaa; font-size: 12px; }
+.variants { margin: 0; color: var(--mute); font-size: 12px; }
 
-.artist-list li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; }
+.artist-list li { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; }
 .artist-list .name { font-size: 15px; }
-.disambig { color: #aaa; font-size: 12px; }
+.disambig { color: var(--mute); font-size: 12px; }
 
 /* ===== 歌手页 ===== */
-.artist-head { margin-bottom: 20px; }
-.artist-head h2 { margin: 0 0 6px; }
-.artist-meta { display: flex; gap: 14px; margin: 0 0 8px; color: #666; font-size: 14px; }
-.artist-head .disambig { margin: 0 0 8px; color: #999; font-size: 13px; }
+.artist-head { margin-bottom: 22px; }
+.artist-head h2 { margin: 0 0 8px; }
+.artist-meta { display: flex; gap: 14px; margin: 0 0 8px; color: var(--dim); font-size: 14px; }
+.artist-head .disambig { margin: 0 0 8px; color: var(--mute); font-size: 13px; }
 
 .alias-line, .genre-line {
   display: flex; flex-wrap: wrap; align-items: center;
-  gap: 6px; margin: 0 0 6px; color: #666; font-size: 13px;
+  gap: 6px; margin: 0 0 6px; color: var(--dim); font-size: 13px;
 }
-.alias-line .label, .genre-line .label { color: #aaa; margin-right: 4px; }
+.alias-line .label, .genre-line .label { color: var(--mute); margin-right: 4px; }
 
-.section-title { margin: 26px 0 4px; font-size: 15px; color: #444; }
-.section-title .count { color: #bbb; font-weight: normal; font-size: 13px; }
+.section-title { margin: 32px 0 6px; font-size: 16px; color: var(--text);
+                 font-family: Georgia, "Songti SC", "SimSun", serif; font-weight: 500; }
+.section-title .count { color: var(--mute); font-weight: normal; font-size: 13px;
+                        font-family: system-ui, sans-serif; }
 
 /* 歌手页专辑行右侧的元信息 */
 .album-list .meta {
   display: flex; align-items: center; gap: 10px;
-  flex: none; color: #888; font-size: 13px;
+  flex: none; color: var(--mute); font-size: 13px;
 }
 .album-list .meta .tag {
-  background: #eef; color: #446; padding: 1px 8px;
+  background: var(--plum-bg); color: var(--plum); padding: 1px 9px;
   border-radius: 10px; font-size: 12px;
 }
 
 /* 搜索结果里的歌手链接 */
-.artist-list a.name { color: #3a6ea5; text-decoration: none; font-size: 15px; }
+.artist-list a.name { color: var(--accent); text-decoration: none; font-size: 15px; }
 .artist-list a.name:hover { text-decoration: underline; }
 
-/* 结果被 limit 截断时的提示 */
-.more-hint { margin: 8px 0 0; color: #aaa; font-size: 12px; }
+.more-hint { margin: 8px 0 0; color: var(--mute); font-size: 12px; }
+.more-hint a { color: var(--accent); text-decoration: none; }
+.more-hint a:hover { text-decoration: underline; }
 
 /* ===== 搜索结果分块 tab ===== */
 .search-tabs,
@@ -126,130 +281,127 @@ ul { list-style: none; padding: 0; }
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 18px 0 0;
-  border-bottom: 1px solid #eee;
+  margin: 20px 0 0;
+  border-bottom: 1px solid var(--line);
 }
-.status-tabs { margin: 4px 0 12px; }
-/* 状态筛选右侧的补充说明（识别中的数量），不参与点击 */
+.status-tabs { margin: 4px 0 14px; }
 .status-tabs .tab-note { margin-left: 10px; font-size: 12px; }
 .search-tabs button,
 .status-tabs button {
-  padding: 8px 16px;
+  padding: 9px 16px;
   border: none;
   background: none;
   cursor: pointer;
   font-size: 14px;
-  color: #777;
+  color: var(--mute);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
 .search-tabs button:hover,
-.status-tabs button:hover { color: #222; }
+.status-tabs button:hover { color: var(--text); }
 .search-tabs button.active,
 .status-tabs button.active {
-  color: #222;
+  color: var(--accent);
   font-weight: 600;
-  border-bottom-color: #3a6ea5;
+  border-bottom-color: var(--accent);
 }
 .search-tabs .count,
-.status-tabs .count { color: #aaa; font-weight: normal; font-size: 12px; }
+.status-tabs .count { color: var(--mute); font-weight: normal; font-size: 12px; }
 
 /* ===== 本地搜不到时的 MusicBrainz 查询结果 ===== */
-.no-result .empty { padding: 24px 0 8px; }
+.no-result .empty { padding: 28px 0 8px; }
 
 .lookup-box {
-  margin-top: 12px; padding: 14px 16px;
-  border: 1px solid #e6e6e6; border-radius: 6px; background: #fafafa;
+  margin-top: 14px; padding: 16px 18px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-soft);
 }
-.lookup-title { margin: 0 0 8px; font-size: 13px; color: #666; }
+.lookup-title { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
 .lookup-list { padding: 0; margin: 0; }
 .lookup-list li {
   display: flex; align-items: center; gap: 10px;
-  padding: 7px 0; border-bottom: 1px solid #eee;
+  padding: 8px 0; border-bottom: 1px solid var(--line-soft);
 }
 .lookup-list li:last-child { border-bottom: none; }
 .lookup-list .name { font-size: 15px; }
 .lookup-list .meta { display: flex; align-items: center; gap: 6px; flex: 1; }
 .lookup-list .tag {
-  background: #eef; color: #446; padding: 1px 8px;
+  background: var(--plum-bg); color: var(--plum); padding: 1px 9px;
   border-radius: 10px; font-size: 12px;
 }
 .lookup-list .state { font-size: 12px; }
-.lookup-list .state-ok { color: #3a8a4a; }
-.lookup-list .state-todo { color: #c98a2e; }
+.lookup-list .state-ok { color: var(--sage); }
+.lookup-list .state-todo { color: var(--amber); }
 
-.lookup-tip { margin: 10px 0 0; color: #888; font-size: 12px; }
+.lookup-tip { margin: 12px 0 0; color: var(--mute); font-size: 12px; }
 .lookup-tip code {
-  background: #eee; padding: 1px 6px; border-radius: 3px;
+  background: var(--bg-lift); padding: 1px 6px; border-radius: 3px;
   font-family: ui-monospace, Consolas, monospace;
 }
-.more-hint a { color: #3a6ea5; text-decoration: none; }
-.more-hint a:hover { text-decoration: underline; }
 
 /* ===== 导入歌单 ===== */
-.hint { color: #777; font-size: 13px; margin: 0 0 16px; }
-.hint strong { color: #444; }
+.hint { color: var(--dim); font-size: 13px; margin: 0 0 18px; }
+.hint strong { color: var(--text); }
 
-.import-box { display: flex; gap: 8px; margin-bottom: 16px; }
+.import-box { display: flex; gap: 8px; margin-bottom: 18px; }
 .import-url {
-  flex: 1; padding: 8px 12px; font-size: 14px;
-  border: 1px solid #ddd; border-radius: 4px;
+  flex: 1; padding: 9px 13px; font-size: 14px;
 }
 .import-box button {
-  padding: 8px 20px; font-size: 14px; cursor: pointer;
-  border: 1px solid #3a6ea5; background: #3a6ea5; color: #fff; border-radius: 4px;
+  padding: 9px 22px; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: #1b1512;
+  border-radius: var(--radius-sm); font-weight: 600;
 }
-.import-box button:disabled { background: #ccc; border-color: #ccc; cursor: default; }
+.import-box button:hover { background: #e39a7f; border-color: #e39a7f; }
+.import-box button:disabled { background: var(--bg-lift); border-color: var(--line);
+  color: var(--mute); cursor: default; }
 
 .import-summary {
   display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline;
-  margin: 0 0 18px; font-size: 14px;
+  margin: 0 0 20px; font-size: 14px;
 }
-.import-summary .ok { color: #2f7d4f; }
-.import-summary .muted { color: #999; font-size: 13px; }
-.import-summary .gap { color: #b8860b; }
+.import-summary .ok { color: var(--sage); }
+.import-summary .muted { color: var(--mute); font-size: 13px; }
+.import-summary .gap { color: var(--amber); }
 
-.import-sub { margin: 18px 0 6px; font-size: 14px; color: #444; }
+.import-sub { margin: 20px 0 6px; font-size: 14px; color: var(--text); }
 
-.album-link { color: #888; font-size: 13px; text-decoration: none; }
-.album-link:hover { text-decoration: underline; }
-.track-list .state { color: #aaa; font-size: 12px; }
-
-/* 次要文字。通用类——「我的歌单」页在 .import-summary 之外也用它 */
-.muted { color: #999; font-size: 13px; }
+.album-link { color: var(--mute); font-size: 13px; text-decoration: none; }
+.album-link:hover { color: var(--dim); text-decoration: underline; }
+.track-list .state { color: var(--mute); font-size: 12px; }
 
 /* ===== 我的歌单（导入后的完整列表） ===== */
 .playlist-tabs {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px;
 }
 .playlist-tabs .tab {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px; font-size: 13px; cursor: pointer;
-  border: 1px solid #e0e0e0; background: #fafafa; color: #555; border-radius: 16px;
+  padding: 6px 14px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-soft); color: var(--dim);
+  border-radius: 999px;
 }
-.playlist-tabs .tab:hover { border-color: #c8c8c8; }
+.playlist-tabs .tab:hover { border-color: var(--mute); color: var(--text); }
 .playlist-tabs .tab.active {
-  border-color: #3a6ea5; background: #eef3fa; color: #2c5580;
+  border-color: var(--accent); background: var(--accent-bg); color: var(--accent);
 }
-.playlist-tabs .tab-count { color: #aaa; font-size: 12px; }
-.playlist-tabs .tab.active .tab-count { color: #7a9dc4; }
+.playlist-tabs .tab-count { color: var(--mute); font-size: 12px; }
+.playlist-tabs .tab.active .tab-count { color: var(--accent); opacity: .7; }
 
 .my-track-list li {
   display: flex; align-items: center; gap: 12px;
-  padding: 6px 0; border-bottom: 1px solid #f4f4f4; font-size: 14px;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px;
 }
 /* min-width:0 让长歌名可以被压缩，不然会把右边的列挤出去 */
 .my-track-list .name { flex: 1; min-width: 0; }
-.my-track-list .no { width: 34px; text-align: right; color: #bbb; font-size: 12px; }
-.my-track-list .artist { color: #888; font-size: 13px; width: 150px;
+.my-track-list .no { width: 34px; text-align: right; color: var(--mute); font-size: 12px; }
+.my-track-list .artist { color: var(--dim); font-size: 13px; width: 150px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.my-track-list .album { color: #aaa; font-size: 13px; width: 170px;
+.my-track-list .album { color: var(--mute); font-size: 13px; width: 170px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.my-track-list .dur { width: 46px; text-align: right; color: #999; font-size: 13px; }
+.my-track-list .dur { width: 46px; text-align: right; color: var(--mute); font-size: 13px; }
 
 .my-track-list .cover {
-  width: 44px; height: 44px; border-radius: 3px; object-fit: cover; flex: none;
-  background: #f2f2f2;
+  width: 44px; height: 44px; border-radius: 4px; object-fit: cover; flex: none;
+  background: var(--bg-lift);
 }
 /* 平台没给封面时的占位块，保持行高一致 */
 .my-track-list .cover.placeholder { display: inline-block; }
@@ -257,11 +409,9 @@ ul { list-style: none; padding: 0; }
 .my-track-list .state {
   width: 54px; text-align: right; font-size: 12px; flex: none;
 }
-.my-track-list .state.matched { color: #2f7d4f; }
-.my-track-list .state.pending { color: #b8860b; }
-.my-track-list .state.unresolved { color: #bbb; }
-
-.page-info { color: #888; font-size: 13px; }
+.my-track-list .state.matched { color: var(--sage); }
+.my-track-list .state.pending { color: var(--amber); }
+.my-track-list .state.unresolved { color: var(--mute); }
 
 /* ===== 我的歌单：操作条 / 勾选 / 删歌单 ===== */
 .playlist-head {
@@ -270,166 +420,199 @@ ul { list-style: none; padding: 0; }
 .playlist-head .section-title { margin-bottom: 4px; }
 .playlist-actions { display: flex; gap: 8px; flex: none; }
 .playlist-actions button {
-  padding: 4px 12px; font-size: 13px; cursor: pointer;
-  border-radius: 4px; border: 1px solid #ddd; background: #fafafa; color: #555;
+  padding: 4px 13px; font-size: 13px; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid var(--line);
+  background: var(--bg-soft); color: var(--dim);
 }
-.playlist-actions button:disabled { color: #ccc; cursor: default; border-color: #eee; }
-.playlist-actions .ghost:not(:disabled):hover { border-color: #3a6ea5; color: #3a6ea5; }
-.playlist-actions .danger { border-color: #e6b8b8; color: #b44; }
-.playlist-actions .danger:not(:disabled):hover { background: #fdf3f3; border-color: #d99; }
+.playlist-actions button:disabled { color: var(--mute); cursor: default;
+  border-color: var(--line-soft); }
+.playlist-actions .ghost:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+.playlist-actions .danger { border-color: #4a2b2e; color: var(--rose); }
+.playlist-actions .danger:not(:disabled):hover { background: #2b1c1f; border-color: var(--rose); }
 
 .select-bar {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 8px 10px; margin: 0 0 8px;
-  background: #f8f9fb; border: 1px solid #eceff4; border-radius: 4px;
-  font-size: 13px; color: #666;
+  padding: 9px 12px; margin: 0 0 10px;
+  background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--dim);
 }
 .select-bar .pick-all { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.select-bar .pick-count { color: #3a6ea5; }
+.select-bar .pick-count { color: var(--accent); }
 .select-bar button.sm {
-  padding: 3px 10px; font-size: 12px; cursor: pointer;
-  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+  padding: 3px 11px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-lift); color: var(--accent);
+  border-radius: var(--radius-sm);
 }
-.select-bar button.sm:not(:disabled):hover { background: #eef3fa; }
-.select-bar button.sm:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
+.select-bar button.sm:not(:disabled):hover { background: var(--accent-bg); border-color: var(--accent); }
+.select-bar button.sm:disabled { color: var(--mute); cursor: default; border-color: var(--line-soft); }
 
-.my-track-list .pick { flex: none; cursor: pointer; }
+.my-track-list .pick { flex: none; cursor: pointer; accent-color: var(--accent); }
 .my-track-list .pick:disabled { cursor: default; }
-.my-track-list li.picked { background: #f6f9fd; }
+.my-track-list li.picked { background: var(--bg-soft); }
 
 .my-track-list .fav, .my-track-list .drop {
   border: none; background: none; cursor: pointer; padding: 0 2px;
-  line-height: 1; color: #ccc; flex: none;
+  line-height: 1; color: var(--line); flex: none;
 }
 .my-track-list .fav { font-size: 15px; }
-.my-track-list .fav.on { color: #e8a33d; }
-.my-track-list .fav:disabled { color: #e8e8e8; cursor: default; }
-.my-track-list .fav:not(:disabled):hover { color: #e8a33d; }
+.my-track-list .fav.on { color: var(--amber); }
+.my-track-list .fav:disabled { color: var(--line-soft); cursor: default; }
+.my-track-list .fav:not(:disabled):hover { color: var(--amber); }
 .my-track-list .drop { font-size: 13px; }
-.my-track-list .drop:not(:disabled):hover { color: #b44; }
-.my-track-list .drop:disabled { color: #eee; cursor: default; }
+.my-track-list .drop:not(:disabled):hover { color: var(--rose); }
+.my-track-list .drop:disabled { color: var(--line-soft); cursor: default; }
 
 /* ===== 按需入库（③）：行内按钮 / 进度面板 ===== */
 .my-track-list .ingest {
-  flex: none; padding: 2px 8px; font-size: 12px; cursor: pointer;
-  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+  flex: none; padding: 2px 9px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-lift); color: var(--accent);
+  border-radius: var(--radius-sm);
 }
-.my-track-list .ingest:not(:disabled):hover { background: #eef3fa; }
-.my-track-list .ingest:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
+.my-track-list .ingest:not(:disabled):hover { background: var(--accent-bg); border-color: var(--accent); }
+.my-track-list .ingest:disabled { color: var(--mute); cursor: default; border-color: var(--line-soft); }
 /* 抓取中用虚线边框，和「排队等你去点」区分开 */
-.my-track-list .ingest.busy { border-style: dashed; color: #b8860b; border-color: #e8d5a8; }
+.my-track-list .ingest.busy { border-style: dashed; color: var(--amber); border-color: #4a3d24; }
 
 .ingest-panel {
-  margin: 0 0 10px; padding: 8px 10px;
-  background: #f8f9fb; border: 1px solid #eceff4; border-radius: 4px;
-  font-size: 13px; color: #666;
+  margin: 0 0 12px; padding: 10px 12px;
+  background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--dim);
 }
 .ingest-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ingest-row .grow { flex: 1; }
-.ingest-now { color: #3a6ea5; max-width: 420px; overflow: hidden;
+.ingest-now { color: var(--accent); max-width: 420px; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
 /* 小圆点：跑着是绿的，暂停是灰的 */
 .ingest-dot {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
-  background: #2f7d4f; animation: ingest-pulse 1.4s ease-in-out infinite;
+  background: var(--sage); animation: ingest-pulse 1.4s ease-in-out infinite;
 }
-.ingest-dot.paused { background: #bbb; animation: none; }
+.ingest-dot.paused { background: var(--mute); animation: none; }
 @keyframes ingest-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 .ingest-note { margin: 6px 0 0; }
 .ingest-fails { list-style: none; margin: 6px 0 0; padding: 0; }
-.ingest-fails li { display: flex; gap: 8px; padding: 1px 0; font-size: 12px; color: #999; }
-.ingest-fails .name { color: #777; }
-.ingest-fails .why { color: #b44; overflow: hidden; text-overflow: ellipsis;
+.ingest-fails li { display: flex; gap: 8px; padding: 1px 0; font-size: 12px; color: var(--mute); }
+.ingest-fails .name { color: var(--dim); }
+.ingest-fails .why { color: var(--rose); overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; max-width: 420px; }
 
 /* 面板里的小按钮。.select-bar button.sm 是另一套，那个只在勾选条里生效 */
 .ingest-panel button.sm {
-  padding: 3px 10px; font-size: 12px; cursor: pointer;
-  border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5; border-radius: 3px;
+  padding: 3px 11px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg-lift); color: var(--accent);
+  border-radius: var(--radius-sm);
 }
-.ingest-panel button.sm:not(:disabled):hover { background: #eef3fa; }
-.ingest-panel button.sm:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
-
-.notice { color: #2f7d4f; font-size: 13px; }
+.ingest-panel button.sm:not(:disabled):hover { background: var(--accent-bg); border-color: var(--accent); }
+.ingest-panel button.sm:disabled { color: var(--mute); cursor: default; border-color: var(--line-soft); }
 
 /* ===== 音乐人格报告 ===== */
-.persona-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+
+.scope-note {
+  margin: 0 0 4px; font-size: 12px; letter-spacing: .04em;
+  color: var(--plum); text-transform: uppercase;
+}
+
+.persona-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 18px;
+               flex-wrap: wrap; }
 .persona-bar select {
-  padding: 4px 8px; font-size: 13px; border: 1px solid #ddd;
-  border-radius: 4px; background: #fafafa; color: #555;
+  padding: 5px 10px; font-size: 13px;
 }
+.persona-bar .scope-select { max-width: 380px; flex: 1; min-width: 200px; }
 .persona-bar button {
-  padding: 5px 16px; font-size: 13px; cursor: pointer;
-  border-radius: 4px; border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5;
+  padding: 6px 18px; font-size: 13px; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid var(--accent);
+  background: var(--accent-bg); color: var(--accent); font-weight: 600;
 }
-.persona-bar button:disabled { color: #ccc; cursor: default; border-color: #eee; }
+.persona-bar button:hover:not(:disabled) { background: var(--accent); color: #1b1512; }
+.persona-bar button:disabled { color: var(--mute); cursor: default;
+  border-color: var(--line); background: var(--bg-soft); }
 
 /* 进度。30 秒的空白页留不住用户 —— 这条是体验的关键，不是装饰 */
-.persona-progress { margin: 0 0 18px; }
+.persona-progress { margin: 0 0 22px; }
 .persona-progress .bar {
-  height: 6px; background: #eef1f5; border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+  height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 8px;
 }
 .persona-progress .bar span {
-  display: block; height: 100%; background: #3a6ea5;
-  transition: width .6s ease; border-radius: 3px;
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--plum));
+  transition: width .6s ease; border-radius: 2px;
 }
 .persona-progress button { margin-top: 4px; }
 
-.persona-dim { margin: 0 0 22px; }
-.persona-dim h4 {
-  margin: 0 0 6px; font-size: 15px; color: #333;
-  display: flex; align-items: center; gap: 8px;
+/* 名字的依据。比正文弱、比纯灰有一点颜色 —— 它是「这句话打哪儿来」，
+   不该抢名字的戏，但也不能看不见 */
+.persona-basis {
+  margin: 10px 0 0; font-size: 12.5px; color: var(--mute);
+  padding-left: 10px; border-left: 2px solid var(--line);
+  line-height: 1.7;
 }
-.persona-dim .summary { margin: 0 0 8px; color: #555; font-size: 14px; }
+
+.persona-dim { margin: 0 0 26px; }
+.persona-dim h4 {
+  margin: 0 0 6px; font-size: 15px; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+  font-family: Georgia, "Songti SC", "SimSun", serif; font-weight: 500;
+}
+.persona-dim .summary { margin: 0 0 10px; color: var(--dim); font-size: 14px; }
 .persona-dim .claims { margin: 0; padding-left: 18px; }
-.persona-dim .claims li { margin-bottom: 6px; color: #555; font-size: 14px; line-height: 1.6; }
-.persona-dim.limits { background: #fafafa; padding: 12px 16px; border-radius: 4px; }
+.persona-dim .claims li { margin-bottom: 7px; color: var(--dim); font-size: 14px;
+                          line-height: 1.7; }
+.persona-dim.limits { background: var(--bg-soft); padding: 16px 20px;
+  border-radius: var(--radius); border: 1px solid var(--line-soft); }
 .persona-dim.limits ul { margin: 0; padding-left: 18px; }
-.persona-dim.limits li { color: #888; font-size: 13px; margin-bottom: 4px; }
+.persona-dim.limits li { color: var(--mute); font-size: 13px; margin-bottom: 5px; }
 
 /* 置信度标记。low 要显眼 —— 那一档的结论基本不能当结论用 */
-.conf { font-size: 12px; font-weight: normal; padding: 1px 7px; border-radius: 3px; }
-.conf.high { background: #e8f5ec; color: #2f7d4f; }
-.conf.medium { background: #fdf6e3; color: #b8860b; }
-.conf.low { background: #f2f2f2; color: #999; }
+.conf { font-size: 12px; font-weight: normal; padding: 1px 9px; border-radius: 999px; }
+.conf.high { background: var(--sage-bg); color: var(--sage); }
+.conf.medium { background: var(--amber-bg); color: var(--amber); }
+.conf.low { background: var(--bg-lift); color: var(--mute); }
 /* 推断不是实测。这个标记是原则 4 的落点，别省 */
 .tag-infer {
-  font-size: 11px; padding: 1px 6px; border-radius: 3px;
-  background: #fdf6e3; color: #b8860b; margin-left: 6px;
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--plum-bg); color: var(--plum); margin-left: 6px;
 }
 
 .rec-list { list-style: none; margin: 0; padding: 0; }
 .rec-list > li {
-  padding: 10px 0; border-bottom: 1px solid #f2f2f2;
+  padding: 14px 0; border-bottom: 1px solid var(--line-soft);
 }
 .rec-list .row { display: flex; align-items: baseline; gap: 10px; }
-.rec-list .name { font-size: 14px; color: #333; }
-.rec-list .artist { color: #888; font-size: 13px; }
-.rec-list .why { color: #3a6ea5; font-size: 12px; margin-left: auto; flex: none; }
+.rec-list .name { font-size: 15px; color: var(--text); }
+.rec-list .artist { color: var(--dim); font-size: 13px; }
+.rec-list .why { color: var(--plum); font-size: 12px; margin-left: auto; flex: none; }
 /* 「为什么推荐」和「和你过去的关系」——这个功能的卖点，视觉上不能弱于歌名 */
-.rec-list .reason { margin: 4px 0 0; color: #555; font-size: 13px; line-height: 1.6; }
-.rec-list .relation { margin: 2px 0 0; color: #999; font-size: 12px; line-height: 1.5; }
+.rec-list .reason { margin: 6px 0 0; color: var(--dim); font-size: 13px; line-height: 1.7; }
+.rec-list .relation { margin: 3px 0 0; color: var(--mute); font-size: 12px;
+                      line-height: 1.6; font-style: italic; }
 
-.persona-ask { margin-top: 28px; padding-top: 18px; border-top: 1px solid #eee; }
-.persona-ask h4 { margin: 0 0 6px; font-size: 15px; color: #333; }
-.msg-list { list-style: none; margin: 12px 0; padding: 0; }
-.msg-list li { margin-bottom: 10px; display: flex; gap: 8px; font-size: 14px; line-height: 1.6; }
-.msg-list .who { flex: none; width: 34px; color: #999; font-size: 13px; }
-.msg-list li.user .who { color: #3a6ea5; }
-.msg-list .text { color: #444; }
+.persona-ask { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+.persona-ask h4 { margin: 0 0 6px; font-size: 15px; color: var(--text);
+                  font-family: Georgia, "Songti SC", "SimSun", serif; font-weight: 500; }
+.msg-list { list-style: none; margin: 14px 0; padding: 0; }
+.msg-list li { margin-bottom: 12px; display: flex; gap: 10px; font-size: 14px;
+               line-height: 1.7; }
+.msg-list .who { flex: none; width: 34px; color: var(--mute); font-size: 13px; }
+.msg-list li.user .who { color: var(--accent); }
+.msg-list .text { color: var(--dim); }
+.msg-list li.assistant .text { color: var(--text); }
 
 .ask-bar { display: flex; gap: 8px; }
 .ask-input {
-  flex: 1; padding: 7px 10px; font-size: 14px;
-  border: 1px solid #ddd; border-radius: 4px;
+  flex: 1; padding: 9px 12px; font-size: 14px;
 }
-.ask-input:disabled { background: #fafafa; }
+.ask-input:disabled { background: var(--bg); color: var(--mute); }
 .ask-bar button {
-  padding: 0 18px; font-size: 13px; cursor: pointer;
-  border-radius: 4px; border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5;
+  padding: 0 20px; font-size: 13px; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid var(--accent);
+  background: var(--accent-bg); color: var(--accent); font-weight: 600;
 }
-.ask-bar button:disabled { color: #ccc; cursor: default; border-color: #eee; }
+.ask-bar button:hover:not(:disabled) { background: var(--accent); color: #1b1512; }
+.ask-bar button:disabled { color: var(--mute); cursor: default;
+  border-color: var(--line); background: var(--bg-soft); }
+
 .fav-opt {
   display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: #666; margin: 0 0 16px; cursor: pointer;
+  font-size: 13px; color: var(--dim); margin: 0 0 18px; cursor: pointer;
 }
+.fav-opt input { accent-color: var(--accent); }

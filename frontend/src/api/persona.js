@@ -12,9 +12,22 @@ import http from './http'
  * 形状和「我的歌单」那套入库轮询一模一样，可以对着 MyPlaylistView 看。
  */
 
-/** 排一次报告生成。返回 { runId, estimateSeconds } */
-export const apiRequestReport = (provider = 'deepseek') =>
-  http.post('/agent/report', null, { params: { provider } })
+/**
+ * 排一次报告生成。返回 { runId, estimateSeconds, scopeKind }。
+ *
+ * @param provider  deepseek / qwen
+ * @param scopeKind all（收藏 + 全部歌单）/ favorites（只要收藏）/ playlist
+ * @param scopeRef  scopeKind=playlist 时必填，是导入歌单的 id
+ *
+ * 【范围写进 run 行，不只靠参数传】Python 子进程只拿到一个 run-id，
+ * 它得自己去库里读这一趟该分析什么。多一条传递路径就多一处可能不一致。
+ *
+ * 【越权】scopeRef 是自增 id，后端会校验归属，不是本人的歌单返回 404。
+ */
+export const apiRequestReport = (provider = 'deepseek', scopeKind = 'all', scopeRef = null) =>
+  http.post('/agent/report', null, {
+    params: { provider, scopeKind, ...(scopeRef == null ? {} : { scopeRef }) }
+  })
 
 /** 追问。返回 { runId } */
 export const apiAsk = (reportId, question) =>

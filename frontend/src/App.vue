@@ -53,7 +53,9 @@ function logout() {
       <button @click="logout">退出</button>
     </nav>
   </header>
-  <main>
+  <!-- 专辑页放宽：封面网格在 900px 里只能排 5 列，太挤。
+       其它页保持 900 —— 文字行宽再宽就不好读了 -->
+  <main :class="{ wide: route.name === 'albums' }">
     <RouterView />
   </main>
 </template>
