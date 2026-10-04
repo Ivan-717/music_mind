@@ -39,6 +39,18 @@ dist/
 # 按需入库的子进程输出（backend 的 ingestion.log-dir）。按 job id 分文件，会一直涨
 logs/
 
+# Agent 报告的产出目录（agent-service 的 --out）。每次生成都是新文件，会一直堆
+agent-service/out/
+
+# LangGraph 的 checkpoint 库。**单文件已经 152MB** —— SqliteSaver 每个节点
+# 存一次完整 state，而 state 里带着 tool_results。它是纯运行期状态：
+# 删掉只是丢掉「图跑到一半」，报告本身在 agent_report 表里，一行不少
+agent-service/.data/
+
+# 评估的原始产出（每次 run_eval 一个带时间戳的目录）。结论在
+# docs/phase5-handoff.md 里，切分由固定种子复现，这些 CSV 是可再生的中间物
+agent-service/musicmind_agent/evals/results/
+
 # 封面缓存：fetch_covers.py 一专辑一张，已存在就跳过。
 # 可再生（跑一次脚本就有）、会随库增长（当前 232 张 5.9MB，按需入库后专辑数已到 471）。
 # 数据与存储原则 15.2 写的就是「按需抓取 + 可淘汰缓存，不进 git」。
