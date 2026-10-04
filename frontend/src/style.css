@@ -351,6 +351,84 @@ ul { list-style: none; padding: 0; }
 .ingest-panel button.sm:disabled { color: #bbb; cursor: default; border-color: #e8e8e8; }
 
 .notice { color: #2f7d4f; font-size: 13px; }
+
+/* ===== 音乐人格报告 ===== */
+.persona-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+.persona-bar select {
+  padding: 4px 8px; font-size: 13px; border: 1px solid #ddd;
+  border-radius: 4px; background: #fafafa; color: #555;
+}
+.persona-bar button {
+  padding: 5px 16px; font-size: 13px; cursor: pointer;
+  border-radius: 4px; border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5;
+}
+.persona-bar button:disabled { color: #ccc; cursor: default; border-color: #eee; }
+
+/* 进度。30 秒的空白页留不住用户 —— 这条是体验的关键，不是装饰 */
+.persona-progress { margin: 0 0 18px; }
+.persona-progress .bar {
+  height: 6px; background: #eef1f5; border-radius: 3px; overflow: hidden; margin-bottom: 6px;
+}
+.persona-progress .bar span {
+  display: block; height: 100%; background: #3a6ea5;
+  transition: width .6s ease; border-radius: 3px;
+}
+.persona-progress button { margin-top: 4px; }
+
+.persona-dim { margin: 0 0 22px; }
+.persona-dim h4 {
+  margin: 0 0 6px; font-size: 15px; color: #333;
+  display: flex; align-items: center; gap: 8px;
+}
+.persona-dim .summary { margin: 0 0 8px; color: #555; font-size: 14px; }
+.persona-dim .claims { margin: 0; padding-left: 18px; }
+.persona-dim .claims li { margin-bottom: 6px; color: #555; font-size: 14px; line-height: 1.6; }
+.persona-dim.limits { background: #fafafa; padding: 12px 16px; border-radius: 4px; }
+.persona-dim.limits ul { margin: 0; padding-left: 18px; }
+.persona-dim.limits li { color: #888; font-size: 13px; margin-bottom: 4px; }
+
+/* 置信度标记。low 要显眼 —— 那一档的结论基本不能当结论用 */
+.conf { font-size: 12px; font-weight: normal; padding: 1px 7px; border-radius: 3px; }
+.conf.high { background: #e8f5ec; color: #2f7d4f; }
+.conf.medium { background: #fdf6e3; color: #b8860b; }
+.conf.low { background: #f2f2f2; color: #999; }
+/* 推断不是实测。这个标记是原则 4 的落点，别省 */
+.tag-infer {
+  font-size: 11px; padding: 1px 6px; border-radius: 3px;
+  background: #fdf6e3; color: #b8860b; margin-left: 6px;
+}
+
+.rec-list { list-style: none; margin: 0; padding: 0; }
+.rec-list > li {
+  padding: 10px 0; border-bottom: 1px solid #f2f2f2;
+}
+.rec-list .row { display: flex; align-items: baseline; gap: 10px; }
+.rec-list .name { font-size: 14px; color: #333; }
+.rec-list .artist { color: #888; font-size: 13px; }
+.rec-list .why { color: #3a6ea5; font-size: 12px; margin-left: auto; flex: none; }
+/* 「为什么推荐」和「和你过去的关系」——这个功能的卖点，视觉上不能弱于歌名 */
+.rec-list .reason { margin: 4px 0 0; color: #555; font-size: 13px; line-height: 1.6; }
+.rec-list .relation { margin: 2px 0 0; color: #999; font-size: 12px; line-height: 1.5; }
+
+.persona-ask { margin-top: 28px; padding-top: 18px; border-top: 1px solid #eee; }
+.persona-ask h4 { margin: 0 0 6px; font-size: 15px; color: #333; }
+.msg-list { list-style: none; margin: 12px 0; padding: 0; }
+.msg-list li { margin-bottom: 10px; display: flex; gap: 8px; font-size: 14px; line-height: 1.6; }
+.msg-list .who { flex: none; width: 34px; color: #999; font-size: 13px; }
+.msg-list li.user .who { color: #3a6ea5; }
+.msg-list .text { color: #444; }
+
+.ask-bar { display: flex; gap: 8px; }
+.ask-input {
+  flex: 1; padding: 7px 10px; font-size: 14px;
+  border: 1px solid #ddd; border-radius: 4px;
+}
+.ask-input:disabled { background: #fafafa; }
+.ask-bar button {
+  padding: 0 18px; font-size: 13px; cursor: pointer;
+  border-radius: 4px; border: 1px solid #c9d6e5; background: #fff; color: #3a6ea5;
+}
+.ask-bar button:disabled { color: #ccc; cursor: default; border-color: #eee; }
 .fav-opt {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: #666; margin: 0 0 16px; cursor: pointer;

@@ -45,6 +45,11 @@ const routes = [
     component: () => import('@/views/MyPlaylistView.vue')
   },
 
+  {
+    path: '/persona',
+    name: 'persona',
+    component: () => import('@/views/PersonaView.vue')
+  },
   { path: '/:pathMatch(.*)*', redirect: '/albums' }
 ]
 
