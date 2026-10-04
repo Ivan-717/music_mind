@@ -60,6 +60,51 @@ class ArtistRepository:
 
 
 
+    def update_meta(
+        self,
+        musicbrainz_id: str,
+        country_code: str | None,
+        artist_type: str | None,
+        begin_year: int | None,
+        autocommit: bool = True,
+    ) -> None:
+        """
+        回填艺人元数据，并打上同步时刻。
+
+        【为什么不并进 upsert】upsert 在整艺人导入时跑，那时手里只有 search 的结果，
+        没有 country / type / begin —— 那要额外一次 inc=genres 的请求。
+        所以单独一条路径，由 backfill_artist_meta.py 驱动。
+
+        【为什么用 COALESCE 而不是直接赋值】MusicBrainz 上这三个字段是稀疏的
+        （抽样：country 80% / type 93% / begin 70%）。某次请求没返回某个字段时，
+        不该把之前已经填好的值清成 NULL。
+
+        meta_synced_at 无条件更新：它记的是「问过了」，不是「问到了」。
+        没有它，上游本来就空的那些艺人在每次续跑时都会被重新问一遍。
+        """
+        sql = """
+        UPDATE artist
+           SET country_code   = COALESCE(%s, country_code),
+               type           = COALESCE(%s, type),
+               begin_year     = COALESCE(%s, begin_year),
+               meta_synced_at = NOW()
+         WHERE musicbrainz_id = %s
+        """
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                sql,
+                (
+                    country_code,
+                    artist_type,
+                    begin_year,
+                    musicbrainz_id,
+                ),
+            )
+
+        if autocommit:
+            self.connection.commit()
+
     def ensure_stub(
         self,
         musicbrainz_id: str,
