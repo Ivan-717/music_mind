@@ -29,6 +29,7 @@ for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 from config.settings import MUSICBRAINZ_CONFIG  # noqa: E402
+from cover import CoverArtClient, ensure_cover  # noqa: E402
 from database.connection import get_connection  # noqa: E402
 from musicbrainz import MusicBrainzClient  # noqa: E402
 from musicbrainz.adapter import MusicBrainzDataAdapter  # noqa: E402
@@ -40,6 +41,33 @@ from musicbrainz.ingest import (  # noqa: E402
 # 从 main.py 借 ImportStats：统计口径和整艺人导入共用一套，不另立一份
 # （另立一份的话，两边迟早对不上，而且对不上时没人会发现）
 from main import ImportStats  # noqa: E402
+
+
+def fetch_cover_for_release(connection, release_mbid: str) -> str:
+    """刚入库的 release 对应的专辑，顺手把封面抓下来。返回一句状态描述。
+
+    【为什么要单独一个客户端、还调小重试】这条路径是用户点了「入库」在等的，
+    而 cover.store.ensure_cover 不会抛异常 —— 所以卡住的时间就是用户多等的时间。
+    默认的 3 次 × 20 秒最坏会给一次 6 秒的入库加上 60 秒。
+    调到 2 × 15 秒，最坏 30 秒，仍然远低于 Java 那边 300 秒的任务超时。
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT album_id FROM music_release WHERE musicbrainz_id = %s",
+            (release_mbid,),
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        # 理论上不会：上面刚把这个 release 写进去并 commit 了
+        return "没找到刚入库的 release"
+
+    client = CoverArtClient(
+        user_agent=MUSICBRAINZ_CONFIG["user_agent"],
+        timeout=15,
+        max_retries=2,
+    )
+    return ensure_cover(client, int(row["album_id"]), [release_mbid])
 
 
 def run(release_mbid: str) -> int:
@@ -55,6 +83,8 @@ def run(release_mbid: str) -> int:
     connection = get_connection()
 
     ctx = build_release_ingest_context(connection)
+
+    cover_note = ""
 
     try:
 
@@ -79,6 +109,13 @@ def run(release_mbid: str) -> int:
 
         connection.commit()
 
+        # 【入库后顺手补一张封面】③ 按需入库进来的专辑原来没人抓封面 ——
+        # CoverImage 直接拼 /covers/{albumId}.jpg，文件不在就是一片占位块。
+        #
+        # 放在 commit 之后有两个理由：一次网络调用不该包在事务里；
+        # 而且封面抓不到也绝不能让这次入库算失败（ensure_cover 不抛异常）
+        cover_note = fetch_cover_for_release(connection, release_mbid)
+
     except Exception as e:
 
         connection.rollback()
@@ -93,6 +130,11 @@ def run(release_mbid: str) -> int:
 
     finally:
         connection.close()
+
+    # 封面那句走 stderr：stdout 的 INGEST_OK 是「一行结果」，调用方在读它。
+    # 多塞一个字段就多一处可能被解析坏的地方。stderr 被 Java 合进日志，
+    # 排障时看得到，不影响协议
+    print(f"COVER {release_mbid} {cover_note}", file=sys.stderr)
 
     print(
         f"INGEST_OK {release_mbid} "

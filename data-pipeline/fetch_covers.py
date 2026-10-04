@@ -11,12 +11,11 @@ from pathlib import Path
 # 必须在创建 requests.Session 之前 import。
 from config.settings import MUSICBRAINZ_CONFIG
 
-from cover import CoverArtClient
+# 【目录和落盘都从 cover 包里拿】按需入库（ingest_release.py）也要写同一个目录，
+# 各写一份的话迟早漂移 —— 而漂移的表现是「批处理抓的图在，按需抓的不见了」，
+# 页面上分不出是谁写的
+from cover import COVER_DIR, CoverArtClient, save_cover
 from database.connection import get_connection
-
-# data-pipeline/fetch_covers.py -> data-pipeline/ -> 项目根目录
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-COVER_DIR = PROJECT_ROOT / "frontend" / "public" / "covers"
 
 
 @dataclass
@@ -108,13 +107,6 @@ def load_album_releases(connection) -> list[tuple[int, str, list[str]]]:
         (album_id, name, mbids)
         for album_id, (name, mbids) in albums.items()
     ]
-
-
-def save_cover(album_id: int, data: bytes) -> Path:
-    COVER_DIR.mkdir(parents=True, exist_ok=True)
-    path = COVER_DIR / f"{album_id}.jpg"
-    path.write_bytes(data)
-    return path
 
 
 def fetch_all(
