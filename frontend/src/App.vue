@@ -38,6 +38,7 @@ function logout() {
       <RouterLink to="/favorites">我的收藏</RouterLink>
       <RouterLink to="/import">导入歌单</RouterLink>
       <RouterLink to="/my-playlist">我的歌单</RouterLink>
+      <RouterLink to="/explore">音乐探索</RouterLink>
       <RouterLink to="/persona">音乐人格</RouterLink>
       <input
         v-model="kw"
