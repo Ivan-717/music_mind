@@ -198,7 +198,15 @@ public class AgentWorker implements SmartLifecycle {
         // 【python 自己写状态】Java 这边不写 DONE / FAILED ——
         // 真实结果（成功还是失败、报告 id 是多少）只有子进程知道。
         // 这里只负责起进程、等它、超时强杀。
-        String subcommand = "report".equals(run.getKind()) ? "run" : "ask";
+        // 【kind → 子命令必须一一对上】原来写的是「不是 report 就当 ask」——
+        // 加了 kind='chat' 之后，对话任务会被当成追问跑，Python 那边去找报告，
+        // 报「报告不存在」，而那个措辞会让人以为报告真的没了。
+        // 加新 kind 时这里必须跟着改，否则失败信息指向完全无关的地方
+        String subcommand = switch (run.getKind()) {
+            case "report" -> "run";
+            case "chat" -> "chat";
+            default -> "ask";
+        };
         String failure = runPython(subcommand, run.getId());
 
         if (failure != null) {

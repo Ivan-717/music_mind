@@ -23,4 +23,19 @@ public interface AgentMessageMapper {
             ORDER BY id
             """)
     List<Map<String, Object>> listByReport(@Param("reportId") Long reportId);
+
+    /**
+     * 一个会话的全部消息。**整段取回来**，不做增量 ——
+     * 前端轮询时手里已经有前面的了，整段替换比算增量简单，也不会错位。
+     *
+     * content 是 JSON（{"answer":..., "recommendations":[...]}），
+     * **原样透传不解析**，和 report_json 同一条规矩。
+     */
+    @Select("""
+            SELECT id, role, content, run_id, created_at
+            FROM agent_message
+            WHERE conversation_id = #{conversationId}
+            ORDER BY id
+            """)
+    List<Map<String, Object>> listByConversation(@Param("conversationId") Long conversationId);
 }

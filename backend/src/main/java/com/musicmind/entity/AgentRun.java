@@ -45,6 +45,9 @@ public class AgentRun {
     /** scopeKind=playlist 时是 user_playlist_import.id，其余为 null */
     private Long scopeRef;
 
+    /** chat 属于哪个会话。**和 reportId 互斥**：追问挂报告，对话挂会话 */
+    private Long conversationId;
+
     /** QUEUED / RUNNING / DONE / FAILED */
     private String status;
 

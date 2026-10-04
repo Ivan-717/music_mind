@@ -1,6 +1,7 @@
 package com.musicmind.controller;
 
 import com.musicmind.dto.AskRequest;
+import com.musicmind.dto.ChatRequest;
 import com.musicmind.security.CurrentUser;
 import com.musicmind.service.AgentService;
 import jakarta.validation.Valid;
@@ -49,6 +50,25 @@ public class AgentController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> ask(@Valid @RequestBody AskRequest req) {
         return agentService.ask(CurrentUser.id(), req.getReportId(), req.getQuestion());
+    }
+
+    /** 排一轮对话。conversationId 留空就新开一个会话。同样 202 + 轮询 */
+    @PostMapping("/chat")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, Object> chat(@Valid @RequestBody ChatRequest req) {
+        return agentService.chat(CurrentUser.id(), req.getMessage(), req.getConversationId());
+    }
+
+    /** 我的会话列表（不含消息） */
+    @GetMapping("/conversations")
+    public List<Map<String, Object>> conversations() {
+        return agentService.listConversations(CurrentUser.id());
+    }
+
+    /** 一个会话的全部消息。刷新页面靠它读回历史 */
+    @GetMapping("/conversations/{id}")
+    public Map<String, Object> conversation(@PathVariable Long id) {
+        return agentService.conversationDetail(CurrentUser.id(), id);
     }
 
     /** 轮询这个：run 状态 + 报告（好了的话）+ 追问消息 */

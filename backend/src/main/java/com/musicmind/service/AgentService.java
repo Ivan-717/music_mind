@@ -1,8 +1,10 @@
 package com.musicmind.service;
 
 import com.musicmind.config.AgentProperties;
+import com.musicmind.entity.AgentConversation;
 import com.musicmind.entity.AgentRun;
 import com.musicmind.exception.ApiException;
+import com.musicmind.mapper.AgentConversationMapper;
 import com.musicmind.mapper.AgentMessageMapper;
 import com.musicmind.mapper.AgentReportMapper;
 import com.musicmind.mapper.AgentRunMapper;
@@ -37,6 +39,7 @@ public class AgentService {
     private final AgentReportMapper reportMapper;
     private final AgentMessageMapper messageMapper;
     private final UserPlaylistMapper userPlaylistMapper;
+    private final AgentConversationMapper conversationMapper;
     private final AgentWorker worker;
     private final AgentProperties props;
 
@@ -112,6 +115,78 @@ public class AgentService {
      * 【前端轮询就调这个】一次报告 30 秒，axios 默认 timeout 10 秒，
      * 同步接口必然超时 —— 所以是「排队 + 轮询」。
      */
+    /**
+     * 排一轮对话。
+     *
+     * @param conversationId 为空就新开一个会话；给了就必须是本人的（否则 404）
+     */
+    public Map<String, Object> chat(Long userId, String message, Long conversationId) {
+        if (message == null || message.isBlank()) {
+            throw new ApiException(400, "消息不能为空");
+        }
+        if (message.length() > MAX_QUESTION_LEN) {
+            throw new ApiException(400, "消息太长了");
+        }
+
+        if (conversationId == null) {
+            AgentConversation row = new AgentConversation();
+            row.setUserId(userId);
+            row.setTitle(titleOf(message));
+            conversationMapper.insert(row);
+            conversationId = row.getId();
+        } else if (conversationMapper.findOwned(conversationId, userId) == null) {
+            // 查不到 = 不存在或不是本人的，返回完全一样 ——
+            // 否则「猜 id 试出别人有几个会话」就是信息泄露
+            throw new ApiException(404, "会话不存在");
+        }
+
+        // 防连点：同一会话已经有在排/在跑的对话时不再排
+        if (runMapper.countActiveChat(conversationId) > 0) {
+            throw new ApiException(409, "这个会话已经有一条在回答了，等它出来再问");
+        }
+
+        AgentRun run = new AgentRun();
+        run.setUserId(userId);
+        run.setKind("chat");
+        run.setQuestion(message.strip());
+        run.setConversationId(conversationId);
+        // 对话不用选模型，和追问一样走默认；范围恒为全部
+        run.setProvider(normalizeProvider(null));
+        run.setScopeKind("all");
+        runMapper.insert(run);
+
+        return Map.of("runId", run.getId(), "conversationId", conversationId);
+    }
+
+    /** 我的会话列表。**不带消息** —— 见 AgentConversationMapper 的说明 */
+    public List<Map<String, Object>> listConversations(Long userId) {
+        return conversationMapper.listByUser(userId);
+    }
+
+    /**
+     * 一个会话的全部消息。
+     *
+     * 【为什么单独一个接口】刷新页面时手里只有会话 id，
+     * 而 `/runs/{id}` 要的是运行 id —— 和报告那边 `/reports/{id}` 同一个理由。
+     */
+    public Map<String, Object> conversationDetail(Long userId, Long conversationId) {
+        Map<String, Object> conversation = conversationMapper.findOwned(conversationId, userId);
+        if (conversation == null) {
+            throw new ApiException(404, "会话不存在");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("conversation", conversation);
+        // content 是 JSON，**原样透传不解析** —— 和 report_json 同一条规矩
+        body.put("messages", messageMapper.listByConversation(conversationId));
+        return body;
+    }
+
+    /** 会话标题：第一句的前 20 字 */
+    private static String titleOf(String message) {
+        String t = message.strip();
+        return t.length() <= 20 ? t : t.substring(0, 20) + "…";
+    }
+
     public Map<String, Object> runStatus(Long userId, Long runId) {
         AgentRun run = runMapper.findOwned(runId, userId);
         if (run == null) {
@@ -121,7 +196,11 @@ public class AgentService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("run", runView(run));
 
-        if (run.getReportId() != null) {
+        if (run.getConversationId() != null) {
+            // 对话：UI 的数据源是 agent_message，按【会话】取不是按 run ——
+            // 一轮 run 只产两条消息，用户要看的是整段对话
+            body.put("messages", messageMapper.listByConversation(run.getConversationId()));
+        } else if (run.getReportId() != null) {
             Map<String, Object> report = reportMapper.findOwned(run.getReportId(), userId);
             if (report != null) {
                 // 【原样透传，不解析】report_json 是 JSON 列，MyBatis 取出来是 String，

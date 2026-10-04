@@ -31,9 +31,9 @@ public interface AgentRunMapper {
      */
     @Insert("""
             INSERT INTO agent_run (user_id, kind, question, report_id, provider,
-                                   scope_kind, scope_ref)
+                                   scope_kind, scope_ref, conversation_id)
             VALUES (#{userId}, #{kind}, #{question}, #{reportId}, #{provider},
-                    COALESCE(#{scopeKind}, 'all'), #{scopeRef})
+                    COALESCE(#{scopeKind}, 'all'), #{scopeRef}, #{conversationId})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(AgentRun run);
@@ -46,7 +46,7 @@ public interface AgentRunMapper {
      */
     @Select("""
             SELECT id, user_id, kind, question, report_id, provider,
-                   scope_kind, scope_ref, status,
+                   scope_kind, scope_ref, conversation_id, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE status = 'QUEUED'
@@ -106,7 +106,7 @@ public interface AgentRunMapper {
     /** 一条任务，带归属校验 —— 查别人的必须查不到 */
     @Select("""
             SELECT id, user_id, kind, question, report_id, provider,
-                   scope_kind, scope_ref, status,
+                   scope_kind, scope_ref, conversation_id, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE id = #{id} AND user_id = #{userId}
@@ -120,9 +120,17 @@ public interface AgentRunMapper {
             """)
     int countActiveAsk(@Param("reportId") Long reportId);
 
+    /** 同一个会话有没有在排/在跑的对话（防连点）。和 countActiveAsk 同一个道理 */
+    @Select("""
+            SELECT COUNT(*) FROM agent_run
+            WHERE conversation_id = #{conversationId} AND kind = 'chat'
+              AND status IN ('QUEUED', 'RUNNING')
+            """)
+    int countActiveChat(@Param("conversationId") Long conversationId);
+
     @Select("""
             SELECT id, kind, question, report_id, provider,
-                   scope_kind, scope_ref, status,
+                   scope_kind, scope_ref, conversation_id, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE user_id = #{userId}
