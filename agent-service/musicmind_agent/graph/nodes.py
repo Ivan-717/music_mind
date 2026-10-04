@@ -56,8 +56,32 @@ def resolve_user(state: AgentState, config) -> AgentState:
     artists = {t.artist_id for t in tracks if t.artist_id}
     insufficient = len(tracks) < MIN_TRACKS or len(artists) < MIN_ARTISTS
 
+    started_entry = {"node": "resolve_user",
+                     "ms": int((time.monotonic() - started) * 1000),
+                     "note": f"{len(tracks)} 首 / {len(artists)} 位艺人"}
+
     return {
         "user_id": ctx.evidence.user_id,
+
+        # 【这是一次运行的起点，必须把上一次的残留清干净】
+        #
+        # thread_id 是 `report-{user_id}` —— **同一个人第二次生成会落到同一个
+        # checkpoint 上**，LangGraph 会把上一次的 state 合并进来。不清的话：
+        #
+        #   · tool_results 累积 —— 模型在 prompt 里看得见历史上所有探针的输出，
+        #     而它们的 fact 不在本轮 ctx.facts 里。照着写就是渲染不出来的占位符
+        #     （L1 会抓，但白跑一轮 repair）。**这是修轮次偏高的一个真实原因。**
+        #   · trace 累积 —— 实测跑了 99 次之后，一份报告的 trace 有 834 步，
+        #     checkpoint 库涨到 152MB
+        #   · draft / rendered / violations 同理
+        #
+        # 第一次发现是因为 trace 里 `validate→repair→persist` 出现在
+        # `resolve_user` **之前** —— 那个顺序在图上不可能出现
+        "tool_results": {},
+        "draft": {},
+        "rendered": {},
+        "violations": [],
+
         "plan": {},
         "probes": [],
         "probe_count": 0,
@@ -73,9 +97,9 @@ def resolve_user(state: AgentState, config) -> AgentState:
                 f"（门槛 {MIN_TRACKS} 首 / {MIN_ARTISTS} 位）"
             ) if insufficient else "",
         },
-        "trace": trace(state, "resolve_user",
-                       ms=int((time.monotonic() - started) * 1000),
-                       note=f"{len(tracks)} 首 / {len(artists)} 位艺人"),
+        # 【这里故意不用 trace() 那个 helper】它会把旧 trace 读出来接上去，
+        # 而这一步要的是「从零开始记这一次」。之后每个节点再用 trace() 追加
+        "trace": [started_entry],
     }
 
 
@@ -351,6 +375,16 @@ def _render(draft: dict, facts: dict, candidates=None) -> dict:
         rec["relation_to_history"]["note"] = render_text(
             rec["relation_to_history"]["note"], facts, strict=False)
     data["limitations"] = [render_text(x, facts, strict=False) for x in data["limitations"]]
+
+    # 【依据行由代码渲染，不是 LLM 写的】名字是创作（模型负责），
+    # 「这个名字打哪儿来」是事实（代码负责）。两个来源分开，
+    # 模型就没法通过写一个好看的名字顺手把依据也编了。
+    #
+    # 这里只用 facts，不用 tool_results —— 依据行显示的是素材名（「头部流派」）
+    # 加真值，不显示流派/艺人的名字，所以那层有损还原不影响到它
+    from musicmind_agent.persona import basis_line, traits_from_facts
+    data["persona_basis"] = basis_line(traits_from_facts(facts), facts)
+
     return data
 
 

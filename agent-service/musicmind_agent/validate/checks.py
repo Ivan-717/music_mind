@@ -84,6 +84,20 @@ def check_structure(report, ctx, result: ValidationResult, candidate_ids=None) -
                 + ("（键名看起来像两个真实键的拼接）" if _looks_stitched(key, ctx) else ""),
             ))
 
+    # --- headline.used_facts 必须指向真事实 ---
+    # 【为什么专门查它】名字是这份报告里唯一一处**不挂证据的断言** ——
+    # 它是创作，验证器判不了「贴切」。但模型自报的依据必须是真的：
+    # 填了一个不存在的 key，说明它连「我依据什么」都是编的，
+    # 那这个名字和数据的联系就断了。
+    head = report.get("headline") or {}
+    for key in head.get("used_facts") or []:
+        result.checked += 1
+        if key not in ctx.facts:
+            result.violations.append(Violation_(
+                "structure", "headline.used_facts",
+                f"名字声称依据的事实不存在：{key!r}。"
+                f"used_facts 只能填 prompt 里「画像素材」列出的 fact key，照抄不改"))
+
     # --- metric_ref 的 key 必须存在 ---
     for path, claim in walk_claims(report):
         for ref in claim.get("metric_refs") or []:

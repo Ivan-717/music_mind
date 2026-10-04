@@ -261,3 +261,71 @@ def test_map_candidates_all_invalid_yields_empty():
     from musicmind_agent.graph.nodes import _map_candidates
     draft = {"recommendations": [{"candidate_index": 999, "reason": "x"}]}
     assert _map_candidates(draft, [{"track_id": 1}, {"track_id": 2}])["recommendations"] == []
+
+
+# ---------- 起点必须清干净上一次的残留 ----------
+
+def _ctx_with(n_tracks: int):
+    from musicmind_agent.evidence import EnrichedTrack, EvidenceSet
+    from musicmind_agent.tools.base import ToolContext
+
+    def track(i):
+        return EnrichedTrack(
+            track_id=i, track_name=f"t{i}", duration_ms=240_000,
+            artist_id=100 + i, artist_name=f"a{i}", country_code="CN",
+            album_id=200 + i, album_name=f"al{i}", release_date="2016-01-01",
+            primary_type="Album", album_genres=("pop",), artist_genres=(),
+            arousal_measured=None, artist_verified=True,
+        )
+
+    tracks = [track(i) for i in range(1, n_tracks + 1)]
+    return ToolContext(
+        connection=None,
+        evidence=EvidenceSet(user_id=34, favorite_ids=[],
+                             playlist_ids=[t.track_id for t in tracks]),
+        tracks=tracks, mood_map={}, library_genre_counts={},
+    )
+
+
+def test_resolve_user_wipes_the_previous_run():
+    """**同一个人第二次生成会落在同一个 checkpoint 上。**
+
+    thread_id 是 `report-{user_id}`，LangGraph 会把上一次的 state 合并进来。
+    resolve_user 是一次运行的起点，不清的话：
+
+      · tool_results 累积 —— 模型在 prompt 里看得见历史上所有探针的输出，
+        而它们的 fact 不在本轮 ctx.facts 里，照着写就是渲染不出来的占位符
+        （L1 会抓，但白跑一轮 repair）。**这是修轮次偏高的一个真实原因**
+      · trace 累积 —— 实测跑 99 次之后，一份报告的 trace 有 834 步，
+        checkpoint 库涨到 152MB
+
+    第一次发现是因为 trace 里 `validate→repair→persist` 出现在了
+    `resolve_user` **之前** —— 那个顺序在图上不可能出现。
+    """
+    stale = {
+        "user_id": 34,
+        "tool_results": {"旧的探针": {"facts": {"old.key": 1}}},
+        "draft": {"headline": {"title": "上一份报告"}},
+        "rendered": {"headline": {"title": "上一份报告"}},
+        "violations": [{"layer": "structure", "path": "x", "detail": "y"}],
+        "plan": {"probes": ["tracks"]},
+        "probes": [{"tool": "tracks"}],
+        "probe_count": 3, "probe_tokens": 9999, "probe_barren": 2,
+        "model_done": True, "repair_count": 2, "degraded": True,
+        "usage": {"tokens_in": 99999},
+        "trace": [{"node": "validate"}, {"node": "repair"}, {"node": "persist"}],
+    }
+
+    out = nodes.resolve_user(stale, {"configurable": {"ctx": _ctx_with(25)}})
+
+    assert out["tool_results"] == {}, "上一轮的探针结果会污染 prompt"
+    assert out["draft"] == {}
+    assert out["rendered"] == {}
+    assert out["violations"] == []
+    assert out["plan"] == {} and out["probes"] == []
+    assert out["probe_count"] == 0 and out["model_done"] is False
+    assert out["repair_count"] == 0 and out["degraded"] is False
+
+    # trace 从这一次的第一条重新开始，不是接在旧的后面
+    assert len(out["trace"]) == 1
+    assert out["trace"][0]["node"] == "resolve_user"

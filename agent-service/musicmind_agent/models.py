@@ -64,8 +64,20 @@ class Recommendation(BaseModel):
 
 
 class Headline(BaseModel):
+    """报告的标题。**意象式命名**：不报数字，用一个画面写。
+
+    例：title「夜行的猫」/ subtitle「耳机里循环着十年前的情歌，音量不大」。
+    """
+
     title: str
     subtitle: str = ""
+
+    # 【名字的依据】写这个意象时用了画像素材里的哪几条（填 fact key）。
+    #
+    # 它**不参与渲染** —— 报告里那行「依据」是代码从素材直接渲的，不走 LLM 的手。
+    # 这个字段的作用是逼模型在动笔之前先想清楚「我这句话是打哪儿来的」，
+    # 同时给验证器一个能查的抓手（L1 会核这些 key 是不是真在 facts 仓里）。
+    used_facts: list[str] = Field(default_factory=list)
 
 
 class ReportDraft(BaseModel):

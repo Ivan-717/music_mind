@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from musicmind_agent.llm import LLMClient, LLMResponse
 from musicmind_agent.models import ReportDraft
+from musicmind_agent.persona import render_traits, traits_from_facts
 from musicmind_agent.prompts.compose import PROMPT_VERSION, SYSTEM, USER_TEMPLATE
 from musicmind_agent.render import render_text
 from musicmind_agent.tools import build_context, call, catalog, core_tool_names
@@ -140,6 +141,9 @@ def build_messages(ctx, candidates, tool_results=None, reco_count: int = 5) -> l
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": USER_TEMPLATE.format(
             overview=_format_overview(ctx),
+            # 名字的素材。从 facts 里现挑 —— 确定性，同样的 facts 给同样的素材，
+            # 所以同一个人生成两次，「依据行」是一致的
+            traits=render_traits(traits_from_facts(ctx.facts, results)),
             tool_results=blocks or "（本轮没有额外的工具输出，用上面的概览）",
             unavailable=unavailable,
             reco_count=reco_count,
@@ -165,6 +169,8 @@ def build_report(connection, user_id: int, provider: str, client: LLMClient | No
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": USER_TEMPLATE.format(
             overview=_format_overview(ctx),
+            traits=render_traits(traits_from_facts(
+                ctx.facts, {n: r.as_dict() for n, r in results.items()})),
             tool_results=_format_tool_results(ctx, {n: r.as_dict() for n, r in results.items()})
                           # 这一段必须和用户的曲目划清界限。混在一起时模型
                           # 会把候选当用户的歌，拿它们的 id 去当证据和锚点
