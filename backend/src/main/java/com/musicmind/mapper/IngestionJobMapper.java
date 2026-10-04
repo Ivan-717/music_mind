@@ -22,11 +22,21 @@ public interface IngestionJobMapper {
 
     @Insert("""
             INSERT INTO ingestion_job
-                (user_id, track_row_id, artist_name, title, album_name, duration_ms, status)
+                (user_id, track_row_id, artist_name, title, album_name, duration_ms,
+                 release_mbid, status)
             VALUES
-                (#{userId}, #{trackRowId}, #{artistName}, #{title}, #{albumName}, #{durationMs}, 'QUEUED')
+                (#{userId}, #{trackRowId}, #{artistName}, #{title}, #{albumName}, #{durationMs},
+                 #{releaseMbid}, 'QUEUED')
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /**
+     * 排一条任务。
+     *
+     * 【release_mbid 必须在这里】它原本是 worker 解析完之后才写的**输出**列，
+     * 所以最初的 INSERT 里没有它 —— 于是 agent 发起的抓取（排队时就知道 mbid）
+     * setReleaseMbid 的值被【静默丢掉】，worker 只好回去搜录音，而拿专辑名搜录音
+     * 必然找不到。5 张里 3 张 NOT_FOUND，错误信息还指不到真正的原因。
+     */
     int insert(IngestionJob job);
 
     /**

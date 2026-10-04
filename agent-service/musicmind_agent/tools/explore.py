@@ -414,3 +414,56 @@ def search_tracks(ctx: ToolContext, args: dict) -> ToolResult:
             if (arousal_min is not None or arousal_max is not None) else []
         ),
     )
+# ============================================================
+# 查上游（本地库里没有的东西）
+# ============================================================
+
+@register(
+    "search_upstream", 1,
+    "去 MusicBrainz 找本地库里没有的专辑。"
+    "**只返回候选，不抓取** —— 抓取要用户点了才会发生",
+    {
+        "artist": "艺人名",
+        "release": "专辑名",
+        "tag": "风格标签，比如 britpop / j-rock",
+        "year_from": "最早年份",
+        "year_to": "最晚年份",
+    },
+)
+def search_upstream(ctx: ToolContext, args: dict) -> ToolResult:
+    from musicmind_agent.upstream import MusicBrainzSearch, UpstreamError
+
+    # 至少要给一个条件 —— 空条件等于「随便给我几张」，对用户没意义
+    if not any(args.get(k) for k in ("artist", "release", "tag", "year_from", "year_to")):
+        return ToolResult(tool="search_upstream",
+                          warnings=["至少要给一个搜索条件（artist / release / tag / 年份）"])
+
+    try:
+        found = MusicBrainzSearch().search_releases(
+            artist=args.get("artist"),
+            release=args.get("release"),
+            tag=args.get("tag"),
+            year_from=args.get("year_from"),
+            year_to=args.get("year_to"),
+            limit=int(args.get("limit", 8)),
+        )
+    except UpstreamError as e:
+        # 上游挂了要说出来。返回空 rows 而不带 warning 的话，
+        # 模型会以为「MusicBrainz 上没有」—— 和「网络断了」是两回事
+        return ToolResult(tool="search_upstream",
+                          warnings=[f"查上游失败：{e}"])
+
+    # 【排掉库里已经有的】按 MBID 比 —— 专辑表里 100% 有 musicbrainz_id
+    with ctx.connection.cursor() as cursor:
+        cursor.execute("SELECT musicbrainz_id FROM music_release")
+        known = {row["musicbrainz_id"] for row in cursor.fetchall()}
+    fresh = [x for x in found if x["release_mbid"] not in known]
+
+    return ToolResult(
+        tool="search_upstream",
+        facts={"upstream.found": len(found), "upstream.not_in_library": len(fresh)},
+        rows=fresh,
+        evidence=[],          # 上游的东西不是「用户听过的」，一条证据都不能给
+        coverage=cov(len(found), len(fresh), "「本地没有」的才列出来"),
+        warnings=([] if fresh else ["上游找到的本地都有了，没有需要抓的"]),
+    )

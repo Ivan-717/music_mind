@@ -1,6 +1,7 @@
 package com.musicmind.service;
 
 import com.musicmind.config.IngestionProperties;
+import com.musicmind.dto.AgentFetchRequest;
 import com.musicmind.entity.IngestionJob;
 import com.musicmind.entity.UserPlaylistImport;
 import com.musicmind.entity.UserPlaylistTrack;
@@ -16,8 +17,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 按需入库（③）的排队与查询。真正干活的是 IngestionWorker。
@@ -80,6 +83,97 @@ public class IngestionService {
     }
 
     /** 整单入库：这个歌单里所有还没对齐的曲目 */
+    // 「AI 帮你找的」那张歌单。一个用户一张，抓的都往里追加 ——
+    // 这样用户看得见「我让 AI 找过什么」，而且现成的浏览 / 试听 / 一键收藏都能用
+    private static final String AGENT_PROVIDER = "agent";
+    private static final String AGENT_PLAYLIST_ID = "agent-fetch";
+    private static final String AGENT_PLAYLIST_NAME = "AI 帮你找的";
+
+    /**
+     * Agent 提议的专辑，抓进库。
+     *
+     * 【和 queueTracks 的区别】那边是从用户歌单的一行出发，worker 要去
+     * MusicBrainz 搜录音、挑 release —— 因为那时还不知道该抓哪张。
+     * 这里**已经知道 release MBID 了**（Agent 从上游搜的），所以直接把
+     * `album_name` 填成 mbid：`IngestionWorker.process()` 看到
+     * album_name 非空就跳过搜索直接抓。
+     *
+     * 副作用是**省一次 MusicBrainz 请求** —— 而且避免了「搜出来挑了另一张版本」。
+     */
+    public Map<String, Object> queueAgentFetch(Long userId, List<AgentFetchRequest.Proposal> proposals) {
+        Long importId = ensureAgentImport(userId);
+
+        int queued = 0;
+        int skipped = 0;
+        for (AgentFetchRequest.Proposal p : proposals) {
+            String artist = p.getArtist() == null || p.getArtist().isBlank() ? "未知" : p.getArtist();
+            String title = p.getTitle() == null || p.getTitle().isBlank() ? p.getReleaseMbid() : p.getTitle();
+
+            UserPlaylistTrack row = new UserPlaylistTrack();
+            row.setImportId(importId);
+            row.setUserId(userId);
+            row.setProvider(AGENT_PROVIDER);
+            // external_id 用 release mbid：同一张抓两次不会产生第二行
+            row.setExternalId(p.getReleaseMbid());
+            row.setPosition(0);
+            row.setTitle(title);
+            row.setArtists(artist);
+            row.setAlbumName(title);
+            userPlaylistMapper.upsertTrack(row);
+
+            UserPlaylistTrack saved =
+                    userPlaylistMapper.findTrackRowByExternalId(importId, p.getReleaseMbid());
+            if (saved == null) {
+                continue;          // 理论上不会
+            }
+
+            // 同一张别重复排。复用现有的「歌手 + 歌名」去重，不另加一个按 release 的查询
+            if (jobMapper.countActiveByArtistTitle(artist, title) > 0) {
+                skipped++;
+                continue;
+            }
+
+            IngestionJob job = new IngestionJob();
+            job.setUserId(userId);
+            job.setTrackRowId(saved.getId());
+            job.setArtistName(artist);
+            job.setTitle(title);
+            job.setAlbumName(title);
+            // 【这一行是关键】release_mbid 一填，worker 就跳过「搜录音 → 挑 release」
+            // 直接抓这一张。别把它塞进 album_name —— 那个字段是
+            // 「同一专辑别的歌解析过没有」的复用线索，不是「就是这张」
+            job.setReleaseMbid(p.getReleaseMbid());
+            jobMapper.insert(job);
+            queued++;
+        }
+
+        int queueCount = jobMapper.countQueued();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("queued", queued);
+        out.put("skippedQueued", skipped);
+        out.put("queueCount", queueCount);
+        out.put("importId", importId);
+        out.put("estimateSeconds", queueCount * SECONDS_PER_TRACK);
+        return out;
+    }
+
+    /** 找到或新建「AI 帮你找的」。唯一键是 (user_id, provider, external_playlist_id) */
+    private Long ensureAgentImport(Long userId) {
+        UserPlaylistImport found =
+                userPlaylistMapper.findImport(userId, AGENT_PROVIDER, AGENT_PLAYLIST_ID);
+        if (found != null) {
+            return found.getId();
+        }
+        UserPlaylistImport row = new UserPlaylistImport();
+        row.setUserId(userId);
+        row.setProvider(AGENT_PROVIDER);
+        row.setExternalPlaylistId(AGENT_PLAYLIST_ID);
+        row.setPlaylistName(AGENT_PLAYLIST_NAME);
+        row.setTrackCount(0);
+        userPlaylistMapper.insertImport(row);
+        return row.getId();
+    }
+
     public IngestionQueueResultVO queueImport(Long userId, Long importId) {
         UserPlaylistImport header = userPlaylistMapper.findOwnedImport(importId, userId);
         if (header == null) {

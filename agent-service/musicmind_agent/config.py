@@ -24,6 +24,17 @@ MYSQL_CONFIG = {
     "cursorclass": pymysql.cursors.DictCursor,
 }
 
+# MusicBrainz。**和 Java、data-pipeline 读的是同一个 .env 变量** ——
+# backend/application.yaml 里是 ${MUSICBRAINZ_USER_AGENT:...}，
+# data-pipeline/config/settings.py 也是同一个名字。
+#
+# 【不写死一个假 URL】MusicBrainz 的 User-Agent 政策要求带上真实联系方式，
+# 他们据此联系。编一个不存在的地址比留空更糟 —— 2026 年会因此被限流甚至封。
+# 兜底值和 Java 那边保持一致，格式对了但看得出来是没配
+MUSICBRAINZ_USER_AGENT = os.getenv("MUSICBRAINZ_USER_AGENT") or "MusicMind/1.0 (unknown@example.com)"
+
+MUSICBRAINZ_API = os.getenv("MUSICBRAINZ_API", "https://musicbrainz.org/ws/2")
+
 # iTunes Search API。项目里 ④ 音频试听和音频特征管线共用同一个来源
 ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
 ITUNES_MIN_INTERVAL = float(os.getenv("ITUNES_MIN_INTERVAL", "2.5"))   # 限速约 20-25/分

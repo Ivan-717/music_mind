@@ -1,9 +1,11 @@
 package com.musicmind.controller;
 
 import com.musicmind.dto.AskRequest;
+import com.musicmind.dto.AgentFetchRequest;
 import com.musicmind.dto.ChatRequest;
 import com.musicmind.security.CurrentUser;
 import com.musicmind.service.AgentService;
+import com.musicmind.service.IngestionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import java.util.Map;
 public class AgentController {
 
     private final AgentService agentService;
+    private final IngestionService ingestionService;
 
     /**
      * 排一次报告生成。
@@ -57,6 +60,21 @@ public class AgentController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> chat(@Valid @RequestBody ChatRequest req) {
         return agentService.chat(CurrentUser.id(), req.getMessage(), req.getConversationId());
+    }
+
+    /**
+     * 把 Agent 提议的专辑抓进库。
+     *
+     * 【为什么走这里而不是 Python 直接排队】`ingestion_job` 归 Java 写，
+     * 而且排队有归属校验要做。Python 只管「查上游、给候选」。
+     *
+     * 落点是「AI 帮你找的」那张歌单 —— 用户能在「我的歌单」页看到、
+     * 试听、一键收藏，也能删。
+     */
+    @PostMapping("/fetch")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, Object> fetch(@Valid @RequestBody AgentFetchRequest req) {
+        return ingestionService.queueAgentFetch(CurrentUser.id(), req.getProposals());
     }
 
     /** 我的会话列表（不含消息） */

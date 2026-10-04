@@ -81,6 +81,23 @@ public interface UserPlaylistMapper {
     int upsertTrack(UserPlaylistTrack row);
 
     /**
+     * 按 (import_id, external_id) 找回一行。
+     *
+     * 【为什么要它】upsertTrack 是 INSERT ... ON DUPLICATE KEY UPDATE，
+     * 命中已存在的行时拿不到自增 id（lastInsertId 不可靠）。
+     * 而排入库任务要 track_row_id —— 只能回头查一次。
+     */
+    @Select("""
+            SELECT id, import_id, user_id, provider, external_id, position,
+                   title, artists, album_name, duration_ms, cover_url,
+                   match_status, matched_track_id
+            FROM user_playlist_track
+            WHERE import_id = #{importId} AND external_id = #{externalId}
+            """)
+    UserPlaylistTrack findTrackRowByExternalId(@Param("importId") Long importId,
+                                               @Param("externalId") String externalId);
+
+    /**
      * 把一首歌的对齐结果写回库。
      *
      * 【这是「我的歌单」页能不能收藏的前提】——不写回的话 match_status 永远是

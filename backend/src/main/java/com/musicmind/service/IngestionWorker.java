@@ -249,11 +249,25 @@ public class IngestionWorker implements SmartLifecycle {
 
             // ② 同一张专辑的别的歌可能已经解析过了。同一歌手 + 同一专辑名，
             //    问 MusicBrainz 一百遍也是同一张 release，直接复用
-            String releaseMbid = job.getAlbumName() == null || job.getAlbumName().isBlank()
-                    ? null
-                    : jobMapper.findDoneRelease(job.getArtistName(), job.getAlbumName());
+            // 【⓪ 排队时就定好了的，直接用】agent 发起的抓取走这条 ——
+            // 用户点的就是「这一张 release」，不该再去搜一遍。
+            //
+            // 踩过的坑：一开始想当然地以为「album_name 非空就当 mbid 用」，
+            // 实际那不是它的语义（它是「同一专辑别的歌解析过没有」的复用线索）。
+            // 结果 agent 抓的专辑被拿去搜**录音**，而给的是专辑名 ——
+            // 必然找不到，5 张里 3 张 NOT_FOUND，而错误信息说的是
+            // 「MusicBrainz 上没有可入库的专辑」，指不到真正的原因
+            String releaseMbid = job.getReleaseMbid() == null ? null : job.getReleaseMbid().strip();
 
-            if (releaseMbid == null) {
+            if (releaseMbid == null || releaseMbid.isBlank()) {
+                // ① 同一张专辑的别的歌可能已经解析过了。
+                //    同一歌手 + 同一专辑名，问 MusicBrainz 一百遍也是同一张 release
+                releaseMbid = job.getAlbumName() == null || job.getAlbumName().isBlank()
+                        ? null
+                        : jobMapper.findDoneRelease(job.getArtistName(), job.getAlbumName());
+            }
+
+            if (releaseMbid == null || releaseMbid.isBlank()) {
                 MbReleaseCandidateVO candidate = lookupService.findRelease(
                         job.getTitle(), job.getArtistName(), job.getDurationMs(), job.getAlbumName());
                 releaseMbid = candidate == null ? null : candidate.getMbid();

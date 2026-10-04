@@ -30,6 +30,8 @@ MAX_CHAT_ROUNDS = 6
 HISTORY_TURNS = 6
 # 一轮回答最多推几首
 MAX_RECO = 10
+# 一次最多提议抓几张。和 Java 那边的 MAX_BATCH 对齐
+MAX_FETCH_PROPOSALS = 5
 
 
 CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
@@ -65,6 +67,18 @@ CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
      而这个系统里每句话都要能指回一条事实 —— 一旦开口子，
      它就再也不会说「答不了」了。
 
+   · **但「库里没有」不等于「到此为止」。先调 `search_upstream` 找一找再回答。**
+     上游可能有，找到了就填进 `fetch_proposals` 问用户要不要抓。
+
+     【为什么必须专门写这一条】实测踩过：用户说「给我推荐林俊杰的歌曲」，
+     模型查了事实表发现没有林俊杰，直接回了一句「这件事我做不到」就收工了 ——
+     **一个工具都没调**（`used_tools` 是空的）。它没做错什么，
+     只是没人告诉它「库里没有的东西可以去上游找」。
+     光有 `search_upstream` 这个工具不够，得在规则里明确要求它去用。
+
+     注意范围：只在用户**要某个我们库里没有的东西**（某歌手、某流派、某张专辑）时去找。
+     查用户自己的数据（「我最常听什么」）不用找上游。
+
    两条的区别是**主张的强度**：推荐是替你判断，常识只是转述。
    系统只敢做前者里可验证的那部分。
 
@@ -74,7 +88,14 @@ CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
 {"calls": [{"tool": "工具名", "args": {"参数": "值"}}]}
 
 直接回答：
-{"answer": "回答，数字写 {fact.key}", "recommendations": [{"candidate_index": 3, "reason": "为什么推它"}]}
+{"answer": "回答，数字写 {fact.key}", "recommendations": [{"candidate_index": 3, "reason": "为什么推它"}], "fetch_proposals": [{"release_mbid": "照抄 search_upstream 返回的", "why": "为什么建议抓这张"}]}
+
+**fetch_proposals 只在「用户问的东西库里没有、而 search_upstream 找到了候选」时填**，
+最多 5 条。`release_mbid` 只能照抄工具返回的，**不要自己编** —— 编出来的 id
+要么不存在，要么是另一张专辑，而抓取会照着它去抓。
+
+**你不能自己抓，也不能假设已经抓了。** 抓取是异步的（要 30-60 秒），
+而且必须用户点了才会发生 —— 回答里问他一句「要我抓进来吗」就够了。
 
 **recommendations 只在用户明确要推荐、而且你确实调过工具拿到候选时才填**，
 最多 10 条。`candidate_index` 只能从「候选曲目」那张表里选，不要自己编序号。
@@ -240,6 +261,9 @@ def chat(connection, user_id: int, message: str,
     client = LLMClient(provider=provider)
     pool = CandidatePool()
     used: list[str] = []
+    # search_upstream 返回的候选。它们没有 track_id（不在库里），
+    # 所以 _number_rows 不会碰它们 —— 单独留一份给 fetch_proposals 用
+    upstream_rows: list[dict] = []
 
     # 【必须先跑一遍核心工具】build_context 只把曲目装进 ctx，**不填 facts 仓**。
     # 报告那条路靠上一步的 compose 填过了，对话没有上一步 ——
@@ -275,6 +299,8 @@ def chat(connection, user_id: int, message: str,
                     continue
                 result = call(name, ctx, req.get("args") or {})
                 used.append(name)
+                if name == "search_upstream":
+                    upstream_rows.extend(result.rows)
                 blocks.append(_format_result(name, result.as_dict(), pool))
 
             messages.append({"role": "assistant",
@@ -292,11 +318,33 @@ def chat(connection, user_id: int, message: str,
             return {
                 "answer": render_text(text, ctx.facts, strict=False),
                 "recommendations": _resolve_recos(raw.get("recommendations"), pool, ctx),
+                "fetch_proposals": _resolve_proposals(raw.get("fetch_proposals"), upstream_rows, ctx),
                 "used_tools": used,
             }
 
     return {"answer": "这个问题我查了几轮都没凑齐能回答的数据。",
-            "recommendations": [], "used_tools": used}
+            "recommendations": [], "fetch_proposals": [], "used_tools": used}
+
+
+def _resolve_proposals(items, upstream_rows: list[dict], ctx) -> list[dict]:
+    """把模型提议的 release 映射回 search_upstream 真返回过的那几条。
+
+    **和推荐同一条规矩：只认工具真的返回过的 mbid。** 模型见过一堆 uuid，
+    会照着格式编一个 —— 而抓取会照着它去抓，结果要么 404，要么抓到另一张专辑，
+    而且失败要等几分钟才看得到。越界的直接丢，不猜。
+    """
+    by_mbid = {r["release_mbid"]: r for r in upstream_rows}
+    out = []
+    for item in (items or [])[:MAX_FETCH_PROPOSALS]:
+        row = by_mbid.get((item or {}).get("release_mbid"))
+        if row is None:
+            continue
+        # 【why 也要渲染】和 recommendations 的 reason 同一条规矩：
+        # 凡是 LLM 写的文本都要过一遍 render_text，没有例外。
+        # 漏了的话用户看到的是「正好落在你库里 2005-2010 那两段（合计占 {era.2005.share}）」
+        out.append({**row,
+                    "why": render_text(item.get("why") or "", ctx.facts, strict=False)})
+    return out
 
 
 def _resolve_recos(items, pool: CandidatePool, ctx) -> list[dict]:
