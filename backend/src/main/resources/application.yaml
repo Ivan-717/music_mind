@@ -43,3 +43,15 @@ ingestion:
   log-dir: ../logs/ingestion
   recent-jobs: 20
 
+# 音乐人格 Agent（Phase 6）。路径都相对 backend/，和上面 config.import 的 ../.env 同一套约定
+agent:
+  agent-service-dir: ../agent-service
+  # 【必须指到 .venv 里的那个 python】系统 python 没装 langgraph / librosa，
+  # 用它起子进程会以 ModuleNotFoundError 失败，从 Java 这边只能看到一个非 0 退出码
+  python: ../agent-service/.venv/Scripts/python.exe
+  # 一次报告实测 30 秒（p50 28.7s / p95 33.2s），千问那种慢的 provider 更久。
+  # 卡太紧会把正常的长任务误杀成 FAILED
+  job-timeout-seconds: 300
+  poll-interval-ms: 1500
+  log-dir: ../logs/agent
+  recent-runs: 20
