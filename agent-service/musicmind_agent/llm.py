@@ -35,9 +35,10 @@ class LLMClient:
     # 让它输出 50 条推荐时直接超过 120 秒 → ReadTimeout → 重试 2 次 → 整折失败。
     # 5 折全挂。评估用的是免费额度，宁愿慢也不要白跑
     timeout: int = 300
-    # 单次生成的上限。50 条推荐带理由约 6~8k token，留足余量。
-    # 两家的上限都是 8192，设成它
-    max_tokens: int = 8192
+    # 单次生成的上限。**默认值在 provider 注册表里**（config.LLM_PROVIDERS），
+    # 因为每家的硬上限不同 —— 详情见那边的注释。
+    # None = 用这家注册表里的值；显式传一个数可以覆盖（测试用）
+    max_tokens: int | None = None
     max_retries: int = 2
 
     config: dict = field(init=False)
@@ -51,6 +52,8 @@ class LLMClient:
             raise LLMError(f"{self.provider} 的 API key 没配（.env 里加 {self.provider.upper()}_API_KEY）")
         if not self.config["model"]:
             raise LLMError(f"{self.provider} 的模型名没配（.env 里加 {self.provider.upper()}_MODEL）")
+        if self.max_tokens is None:
+            self.max_tokens = self.config.get("max_tokens", 4096)
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {self.config['api_key']}",
