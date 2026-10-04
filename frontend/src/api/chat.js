@@ -24,3 +24,15 @@ export const apiMyConversations = () => http.get('/agent/conversations')
 
 /** 一个会话的全部消息。刷新页面靠它读回历史 */
 export const apiConversationDetail = (id) => http.get(`/agent/conversations/${id}`)
+
+/**
+ * 把 Agent 提议的专辑抓进库。返回 { queued, skippedQueued, queueCount, importId, estimateSeconds }
+ *
+ * 【为什么抓取是前端的动作】Python 那边只「查上游、给候选」，抓不抓由用户点。
+ * 一是 1 req/s，抓 5 张要 30-60 秒，用户得知道自己在等什么；
+ * 二是让模型自己决定抓什么会抓飞。排队本身归 Java（ingestion_job 是它的队列表）。
+ *
+ * 落点是「AI 帮你找的」那张歌单 —— 在我的歌单页能看、能试听、能一键收藏。
+ */
+export const apiFetchUpstream = (proposals) =>
+  http.post('/agent/fetch', { proposals })

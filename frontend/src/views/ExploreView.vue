@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { apiChat, apiMyConversations, apiConversationDetail } from '@/api/chat'
+import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream } from '@/api/chat'
 import { apiRunStatus } from '@/api/persona'
 import { useDisplay } from '@/composables/useDisplay'
 
@@ -36,13 +36,48 @@ const progress = computed(() =>
  * **Java 那边原样透传不解析**，所以在这里解。user 的是纯文本。
  */
 function parse(content) {
-  if (typeof content !== 'string' || !content.trimStart().startsWith('{')) {
-    return { answer: content || '', recommendations: [] }
-  }
+  const empty = { answer: content || '', recommendations: [], fetch_proposals: [] }
+  if (typeof content !== 'string' || !content.trimStart().startsWith('{')) return empty
   try {
-    return JSON.parse(content)
+    const j = JSON.parse(content)
+    return {
+      answer: j.answer || '',
+      recommendations: j.recommendations || [],
+      // 没有提议时也要给个空数组 —— 模板里直接 .length，undefined 会炸
+      fetch_proposals: j.fetch_proposals || []
+    }
   } catch (e) {
-    return { answer: content, recommendations: [] }
+    return empty
+  }
+}
+
+/** 消息解析一次就够了。模板里直接 parse(m.content) 的话，每条要解三遍 */
+const rendered = computed(() =>
+  messages.value.map((m) => ({ id: m.id, role: m.role, ...parse(m.content) }))
+)
+
+const fetching = ref(false)
+const fetched = ref('')
+
+async function fetchAll(msg) {
+  const list = msg.fetch_proposals || []
+  if (!list.length || fetching.value) return
+  fetching.value = true
+  error.value = ''
+  try {
+    // 字段名转成 Java DTO 的驼峰 —— 那边不做 snake_case 兼容
+    const r = await apiFetchUpstream(list.map((p) => ({
+      releaseMbid: p.release_mbid, title: p.title, artist: p.artist,
+      year: p.year, why: p.why
+    })))
+    const mins = Math.ceil((r.estimateSeconds || 0) / 60)
+    fetched.value = `已排进队列 ${r.queued} 张`
+      + (r.skippedQueued ? `，${r.skippedQueued} 张已经在队列里` : '')
+      + `。约 ${mins} 分钟，抓完再问一次就有数据了。`
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    fetching.value = false
   }
 }
 
@@ -178,6 +213,7 @@ onMounted(async () => {
   </div>
 
   <p v-if="error" class="err">{{ error }}</p>
+  <p v-if="fetched" class="notice">{{ fetched }}</p>
 
   <div v-if="pollStopped" class="err">
     <p>和服务器失去联系了（连着 {{ POLL_MAX_FAILURES }} 次没连上）。任务可能还在后台跑。</p>
@@ -191,22 +227,44 @@ onMounted(async () => {
 
   <p v-if="loading" class="muted">加载中…</p>
 
-  <p v-else-if="!messages.length && !running" class="empty">
+  <p v-else-if="!rendered.length && !running" class="empty">
     还没有对话。下面问一句试试。
   </p>
 
   <ul v-else class="chat-list">
-    <li v-for="m in messages" :key="m.id" :class="m.role">
+    <li v-for="m in rendered" :key="m.id" :class="m.role">
       <span class="who">{{ m.role === 'user' ? '我' : '分析' }}</span>
       <div class="body">
-        <p class="text">{{ fmt(parse(m.content).answer) }}</p>
-        <ul v-if="parse(m.content).recommendations.length" class="rec-list compact">
-          <li v-for="r in parse(m.content).recommendations" :key="r.track_id" :data-track-id="r.track_id">
+        <p class="text">{{ fmt(m.answer) }}</p>
+
+        <ul v-if="m.recommendations.length" class="rec-list compact">
+          <li v-for="r in m.recommendations" :key="r.track_id" :data-track-id="r.track_id">
             <div class="row">
               <span class="name">{{ fmt(r.name) || ('#' + r.track_id) }}</span>
               <span class="artist">{{ fmt(r.artist_names) }}</span>
             </div>
             <p v-if="r.reason" class="reason">{{ fmt(r.reason) }}</p>
+          </li>
+        </ul>
+
+        <!-- 库里没有、但上游有。**抓不抓由用户点** —— 不自动抓 -->
+        <ul v-if="m.fetch_proposals.length" class="fetch-list">
+          <li class="fetch-head muted">
+            这几张不在你库里，MusicBrainz 上有：
+          </li>
+          <li v-for="p in m.fetch_proposals" :key="p.release_mbid">
+            <div class="row">
+              <span class="name">{{ fmt(p.title) }}</span>
+              <span class="artist">
+                {{ fmt(p.artist) }}<template v-if="p.year"> · {{ p.year }}</template>
+              </span>
+            </div>
+            <p v-if="p.why" class="reason">{{ fmt(p.why) }}</p>
+          </li>
+          <li class="fetch-action">
+            <button :disabled="fetching || running" @click="fetchAll(m)">
+              {{ fetching ? '排队中…' : `抓进库里（${m.fetch_proposals.length} 张）` }}
+            </button>
           </li>
         </ul>
       </div>
