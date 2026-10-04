@@ -20,10 +20,20 @@ import java.util.Map;
 @Mapper
 public interface AgentRunMapper {
 
-    /** 排一条任务。status 默认 QUEUED（建表时给的默认值） */
+    /**
+     * 排一条任务。status 默认 QUEUED，scope_kind 默认 all（建表时给的默认值）。
+     *
+     * 【scope_kind 必须 COALESCE】它是 NOT NULL DEFAULT 'all'，但**显式传 NULL
+     * 会覆盖掉默认值**，MySQL 直接报 "Column 'scope_kind' cannot be null"。
+     * 而那个错被全局处理器归成 DataIntegrityViolationException → 404
+     * 「引用的资源不存在」—— 看起来像越权或者报告不存在，完全指不到真正的原因。
+     * 实测：ask 那条路径漏设了 scope，整条追问挂掉。
+     */
     @Insert("""
-            INSERT INTO agent_run (user_id, kind, question, report_id, provider)
-            VALUES (#{userId}, #{kind}, #{question}, #{reportId}, #{provider})
+            INSERT INTO agent_run (user_id, kind, question, report_id, provider,
+                                   scope_kind, scope_ref)
+            VALUES (#{userId}, #{kind}, #{question}, #{reportId}, #{provider},
+                    COALESCE(#{scopeKind}, 'all'), #{scopeRef})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(AgentRun run);
@@ -35,7 +45,8 @@ public interface AgentRunMapper {
      * 锁在语句结束就没了，等于没加。真正的互斥靠 claim() 的条件更新。
      */
     @Select("""
-            SELECT id, user_id, kind, question, report_id, provider, status,
+            SELECT id, user_id, kind, question, report_id, provider,
+                   scope_kind, scope_ref, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE status = 'QUEUED'
@@ -94,7 +105,8 @@ public interface AgentRunMapper {
 
     /** 一条任务，带归属校验 —— 查别人的必须查不到 */
     @Select("""
-            SELECT id, user_id, kind, question, report_id, provider, status,
+            SELECT id, user_id, kind, question, report_id, provider,
+                   scope_kind, scope_ref, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE id = #{id} AND user_id = #{userId}
@@ -109,7 +121,8 @@ public interface AgentRunMapper {
     int countActiveAsk(@Param("reportId") Long reportId);
 
     @Select("""
-            SELECT id, kind, question, report_id, provider, status,
+            SELECT id, kind, question, report_id, provider,
+                   scope_kind, scope_ref, status,
                    error_message, started_at, finished_at, created_at
             FROM agent_run
             WHERE user_id = #{userId}

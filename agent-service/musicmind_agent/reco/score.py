@@ -151,11 +151,24 @@ def content_score(
     return parts
 
 
-def build_profile(tracks: list[EnrichedTrack]) -> TasteProfile:
+def build_profile(tracks: list[EnrichedTrack],
+                  known_artist_ids: set[int] | None = None,
+                  known_track_ids: set[int] | None = None) -> TasteProfile:
     """从用户的曲目归纳口味画像。
 
     【为什么单独一个函数】打分函数必须能对同一个 profile 反复调用（评估要跑
     5 折 × 6 个系统），每次重算 profile 既慢又可能因为顺序不同而不一致。
+
+    【tracks 和 known_* 是两件事】tracks 决定**偏好** —— 流派份额、top 艺人、
+    年代中位数。known_* 决定**「你已经有什么」** —— 候选排除 + 探索判定。
+
+    按一张歌单分析时两者不一样：偏好只来自那张歌单，但「已经有」是全部曲库。
+    不分开的后果有两个，都不会报错：
+      · 候选池只排除那张歌单的歌 → 推荐你在别的歌单里已经有的歌
+      · 探索配额把陈奕迅当陌生歌手 → 你在他那儿有 49 首，那一半名额就废了
+
+    **不传 known_* 时两者相同** —— 全量分析和评估走的就是这条路，
+    行为一个字节都没变，所以这次的改动不会让评估数字动。
     """
     from collections import Counter
 
@@ -193,8 +206,10 @@ def build_profile(tracks: list[EnrichedTrack]) -> TasteProfile:
     return TasteProfile(
         genre_share={g: c / genre_total for g, c in genre_counter.items()},
         top_artists={a for a, _ in artist_counter.most_common(10)},
-        known_artists=set(artist_counter),
-        known_tracks={t.track_id for t in tracks},
+        known_artists=(set(known_artist_ids) if known_artist_ids is not None
+                       else set(artist_counter)),
+        known_tracks=(set(known_track_ids) if known_track_ids is not None
+                      else {t.track_id for t in tracks}),
         median_year=median(years),
         median_duration_ms=median(durations),
         form_share={f: c / form_total for f, c in form_counter.items()},

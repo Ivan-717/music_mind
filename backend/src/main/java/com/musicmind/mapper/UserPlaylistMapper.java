@@ -123,12 +123,25 @@ public interface UserPlaylistMapper {
     int deleteMissing(@Param("importId") Long importId,
                       @Param("keepExternalIds") List<String> keepExternalIds);
 
+    /**
+     * 我导入过的歌单，**带可分析曲目数**（见 UserPlaylistImport.matchedCount）。
+     *
+     * matched_count 的判据必须和 agent-service 的 resolve_user 完全一致 ——
+     * match_status='MATCHED' 且 user_removed=0。对不上的话，下拉里显示
+     * 「427 首可分析」而分析出来是 0 首，那种不一致用户会当成系统坏了。
+     */
     @Select("""
-            SELECT id, provider, external_playlist_id, playlist_name, source_url,
-                   track_count, last_imported_at
-            FROM user_playlist_import
-            WHERE user_id = #{userId}
-            ORDER BY last_imported_at DESC
+            SELECT i.id, i.provider, i.external_playlist_id, i.playlist_name, i.source_url,
+                   i.track_count, i.last_imported_at,
+                   (SELECT COUNT(DISTINCT t.matched_track_id)
+                      FROM user_playlist_track t
+                     WHERE t.import_id = i.id
+                       AND t.match_status = 'MATCHED'
+                       AND t.matched_track_id IS NOT NULL
+                       AND t.user_removed = 0) AS matched_count
+            FROM user_playlist_import i
+            WHERE i.user_id = #{userId}
+            ORDER BY i.last_imported_at DESC
             """)
     List<UserPlaylistImport> listImports(@Param("userId") Long userId);
 

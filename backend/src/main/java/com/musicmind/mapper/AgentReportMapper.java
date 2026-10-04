@@ -18,7 +18,8 @@ import java.util.Map;
 public interface AgentReportMapper {
 
     @Select("""
-            SELECT id, user_id, status, headline, data_scope_json,
+            SELECT id, user_id, status, scope_kind, scope_ref, scope_label,
+                   headline, data_scope_json,
                    report_json, llm_provider, llm_model, tokens_in, tokens_out,
                    latency_ms, created_at
             FROM agent_report
@@ -26,9 +27,15 @@ public interface AgentReportMapper {
             """)
     Map<String, Object> findOwned(@Param("id") Long id, @Param("userId") Long userId);
 
-    /** 列表页不要正文 —— 一份报告的 report_json 有几十 KB，拉十份就是几 MB */
+    /**
+     * 列表页不要正文 —— 一份报告的 report_json 有几十 KB，拉十份就是几 MB。
+     *
+     * 【但 scope_label 要带上】用户可能对同一批歌生成过好几份，
+     * 列表里不显示「这份是按哪张歌单生成的」就分不出哪份是哪份。
+     */
     @Select("""
-            SELECT id, status, headline, llm_provider, llm_model, latency_ms, created_at
+            SELECT id, status, scope_kind, scope_ref, scope_label,
+                   headline, llm_provider, llm_model, latency_ms, created_at
             FROM agent_report
             WHERE user_id = #{userId}
             ORDER BY id DESC

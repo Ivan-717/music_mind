@@ -38,8 +38,10 @@ public class AgentController {
     @PostMapping("/report")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> requestReport(
-            @RequestParam(defaultValue = "deepseek") String provider) {
-        return agentService.requestReport(CurrentUser.id(), provider);
+            @RequestParam(defaultValue = "deepseek") String provider,
+            @RequestParam(defaultValue = "all") String scopeKind,
+            @RequestParam(required = false) Long scopeRef) {
+        return agentService.requestReport(CurrentUser.id(), provider, scopeKind, scopeRef);
     }
 
     /** 对一份已生成的报告追问。同样 202 + 轮询 */

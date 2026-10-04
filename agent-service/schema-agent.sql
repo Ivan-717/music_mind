@@ -73,6 +73,23 @@ CREATE TABLE IF NOT EXISTS `agent_report` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ok'
     COMMENT 'ok / degraded / insufficient_data',
 
+  -- 【分析范围】这一份报告是基于哪批曲目生成的。
+  --   all       = 收藏 + 全部导入歌单（旧报告也是这个语义，默认值正好）
+  --   favorites = 只要收藏
+  --   playlist  = 只要 scope_ref 指的那一张导入歌单
+  -- 三列都写进报告而不是只写进 run：报告列表页直接查这张表（不 JOIN run），
+  -- 而追问要按同样的范围重建 context —— 不重建的话，追问查出来的 facts
+  -- 和报告里的数字对不上，而那种错没有任何东西会报警。
+  `scope_kind` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all'
+    COMMENT 'all / favorites / playlist',
+  -- 【故意不加外键】歌单被删掉时，历史报告必须留着。
+  -- 代价是 scope_ref 可能悬空：读的时候要当「歌单已删除」处理，不能静默返回空集
+  `scope_ref` bigint unsigned DEFAULT NULL
+    COMMENT 'scope_kind=playlist 时是 user_playlist_import.id',
+  -- 显示用。**存快照**，不从导入表 JOIN —— 歌单改名或删除后，
+  -- 历史报告仍然要显示得出「这份是按哪张歌单生成的」
+  `scope_label` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '全部',
+
   -- 【报告主体存 JSON 列，不拆表】schema 还会演化（Phase 7 要加维度），
   -- 拆成 claim 明细表的话每加一个字段都要迁移。库里有先例：album.secondary_types
   `report_json` json NOT NULL COMMENT '渲染后的完整报告',
@@ -107,6 +124,13 @@ CREATE TABLE IF NOT EXISTS `agent_run` (
   `question` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'ask 模式的问题',
   `report_id` bigint unsigned DEFAULT NULL COMMENT 'ask 针对哪份报告；report 完成后回填',
   `provider` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+
+  -- 【这一趟要分析哪些曲目】子进程靠它重建 context。
+  -- 队列项是短命的，所以这里不存 label —— 显示用的份在 agent_report 上
+  `scope_kind` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all'
+    COMMENT 'all / favorites / playlist',
+  `scope_ref` bigint unsigned DEFAULT NULL
+    COMMENT 'scope_kind=playlist 时是 user_playlist_import.id',
 
   `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'QUEUED'
     COMMENT 'QUEUED / RUNNING / DONE / FAILED',

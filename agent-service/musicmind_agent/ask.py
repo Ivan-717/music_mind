@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 
+from musicmind_agent.evidence import SCOPE_ALL
 from musicmind_agent.llm import LLMClient
 from musicmind_agent.render import render_text
 from musicmind_agent.tools import build_context, catalog
@@ -70,10 +71,21 @@ MAX_ASK_ROUNDS = 3
 
 
 def ask(connection, user_id: int, report: dict, saved_facts: dict,
-        question: str, provider: str) -> str:
-    """回答一个问题，返回渲染后的回答文本。"""
+        question: str, provider: str,
+        scope_kind: str = SCOPE_ALL, scope_ref: int | None = None) -> str:
+    """回答一个问题，返回渲染后的回答文本。
 
-    ctx = build_context(connection, user_id)
+    【ctx 必须按报告自己的范围重建】否则追问查出来的 facts 和报告里的数字
+    对不上 —— 报告说「你有 432 首」，追问说「你有 490 首」，
+    而那种错没有任何东西会报警。
+    """
+    ctx = build_context(connection, user_id, None, scope_kind, scope_ref)
+
+    # 范围是按某张歌单、而那张歌单已经被删了。这时候硬答会比不答更糟 ——
+    # 空集喂给模型，它会用常识凑一个答案出来
+    if not ctx.tracks and scope_kind != SCOPE_ALL:
+        return "这份报告的分析范围现在已经查不到曲目了（歌单可能已被删除），没法回答。"
+
     client = LLMClient(provider=provider)
 
     messages = [
@@ -155,11 +167,15 @@ def answer_and_persist(connection, run_id: int) -> None:
 
     run = load_run(connection, run_id)
     if run is None:
-        return
+        # 【抛，不能静默 return】静默返回的话 cli 照打 ASK_OK 退出码 0，
+        # Java 认为成功、不做兜底，那条 run 永远停在 RUNNING。
+        # 和 persist.run_and_persist 同一个坑
+        raise RuntimeError(f"agent_run 里没有 id={run_id} 的行，什么都没跑")
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT report_json, facts_json FROM agent_report WHERE id=%s",
+            "SELECT report_json, facts_json, scope_kind, scope_ref "
+            "FROM agent_report WHERE id=%s",
             (run["report_id"],))
         row = cursor.fetchone()
 
@@ -170,7 +186,8 @@ def answer_and_persist(connection, run_id: int) -> None:
     text = ask(connection, run["user_id"],
                _load_json(row["report_json"]) or {},
                _load_json(row["facts_json"]) or {},
-               run["question"], run["provider"])
+               run["question"], run["provider"],
+               row["scope_kind"] or SCOPE_ALL, row["scope_ref"])
 
     with connection.cursor() as cursor:
         # 先记用户那句、再记回答 —— 顺序就是 UI 里的显示顺序

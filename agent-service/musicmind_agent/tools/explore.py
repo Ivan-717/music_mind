@@ -12,7 +12,6 @@ from collections import Counter
 
 from musicmind_agent.evidence import load_all_enriched
 from musicmind_agent.reco.recall import recommend
-from musicmind_agent.reco.score import build_profile, content_score
 from musicmind_agent.tools.base import ToolContext, ToolResult, cap_evidence, cov, register
 
 
@@ -287,7 +286,6 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
     limit = min(int(args.get("limit", 20)), 100)
     exclude = {int(i) for i in (args.get("exclude_track_ids") or [])}
 
-    profile = build_profile(ctx.tracks)
     exclude |= set(seeds)
 
     # 【和 recommend() 走同一条路，不要另写一套排序】
@@ -299,11 +297,16 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
     #   · 五路召回（原来只用了内容分一路，同专辑/合作艺人那些路根本没走）
     #   · 探索配额（见 recall.EXPLORE_QUOTA）—— 没有它的话候选会被
     #     「你熟悉的歌手」占满，推荐全是熟人，用户找不到新东西
+    #
+    # 【known_* 传的是「全部曲库」不是「选中范围」】按一张歌单分析时，
+    # 画像来自那张歌单，但候选不能推用户别的歌单里已经有的歌
     all_tracks = load_all_enriched(ctx.connection)
-    picked = recommend(ctx.tracks, all_tracks, limit)
+    picked = recommend(ctx.tracks, all_tracks, limit,
+                       known_artist_ids=ctx.all_known_artist_ids,
+                       known_track_ids=ctx.all_known_track_ids)
 
     chosen = [item for item in picked if item.track.track_id not in exclude]
-    considered = len(all_tracks) - len(profile.known_tracks)
+    considered = len(all_tracks) - len(ctx.all_known_track_ids)
 
     facts = {"similar.candidates_considered": considered, "similar.returned": len(chosen)}
     if chosen:

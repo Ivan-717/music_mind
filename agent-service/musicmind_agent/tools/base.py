@@ -76,6 +76,14 @@ class ToolContext:
     library_genre_counts: dict[str, int] = field(default_factory=dict)
     facts: dict[str, float | int | str] = field(default_factory=dict)
 
+    # 【用户全部曲目 / 全部艺人 —— 不管这次分析的是哪个范围】
+    # tracks 是「选中范围」，这两个是「整体」。
+    # 差别的两个用途，都是「不能只看范围」的地方：
+    #   · 候选池要排除全部已有的歌（否则会推你在别的歌单里已有的）
+    #   · 探索配额要按「真的没听过的歌手」算（否则陈奕迅在分析小歌单时算陌生）
+    all_known_track_ids: set[int] = field(default_factory=set)
+    all_known_artist_ids: set[int] = field(default_factory=set)
+
     def fact(self, key: str, value: float | int | str) -> None:
         """登记一条事实。key 必须是 dotted 形式，且不能被重复写。
 

@@ -138,23 +138,58 @@ _ENRICH_SQL = f"""
 """
 
 
-def resolve_user(connection, user_id: int, hidden_ids: set[int] | None = None) -> EvidenceSet:
-    """把一个用户的收藏 + 歌单已对齐曲目读成 EvidenceSet。"""
+# ============================================================
+# 分析范围
+# ============================================================
+#
+# 取值和 agent_report.scope_kind 一一对应。**改这里必须同时改那张表的注释**，
+# 否则 Java 校验的取值范围和 Python 认的取值范围会漂移，而漂移的表现是
+# 「某个范围静默返回空集」—— 空集不会报错，只会变成「数据不足」。
+
+SCOPE_ALL = "all"                # 收藏 + 全部导入歌单（旧报告的语义）
+SCOPE_FAVORITES = "favorites"    # 只要收藏
+SCOPE_PLAYLIST = "playlist"      # 只要 scope_ref 指的那一张导入歌单
+
+SCOPE_LABELS = {SCOPE_ALL: "全部", SCOPE_FAVORITES: "我的收藏"}
+
+
+def resolve_user(connection, user_id: int, hidden_ids: set[int] | None = None,
+                 scope_kind: str = SCOPE_ALL,
+                 scope_ref: int | None = None) -> EvidenceSet:
+    """把一个用户在**指定范围内**的曲目读成 EvidenceSet。
+
+    【为什么范围要在这里而不是在工具里】所有工具都从 ctx.tracks 拿数据，
+    而 ctx.tracks 由这一个函数决定。范围收在这里，15 个工具一个都不用改，
+    也不会有「某个工具忘了套范围」这种漏 —— 那种漏不报错，只是那张图表的
+    分母和别人不一样。
+    """
+    if scope_kind not in (SCOPE_ALL, SCOPE_FAVORITES, SCOPE_PLAYLIST):
+        raise ValueError(f"不认识的 scope_kind：{scope_kind!r}")
+
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT track_id FROM favorite_track WHERE user_id = %s", (user_id,)
         )
         favorites = [row["track_id"] for row in cursor.fetchall()]
 
-        cursor.execute(
-            """
-            SELECT DISTINCT matched_track_id FROM user_playlist_track
-            WHERE user_id = %s AND match_status = 'MATCHED'
-              AND matched_track_id IS NOT NULL AND user_removed = 0
-            """,
-            (user_id,),
-        )
-        playlist = [row["matched_track_id"] for row in cursor.fetchall()]
+        playlist: list[int] = []
+        if scope_kind in (SCOPE_ALL, SCOPE_PLAYLIST):
+            sql = """
+                SELECT DISTINCT matched_track_id FROM user_playlist_track
+                WHERE user_id = %s AND match_status = 'MATCHED'
+                  AND matched_track_id IS NOT NULL AND user_removed = 0
+                """
+            args: list = [user_id]
+            if scope_kind == SCOPE_PLAYLIST:
+                sql += " AND import_id = %s"
+                args.append(scope_ref)
+            cursor.execute(sql, args)
+            playlist = [row["matched_track_id"] for row in cursor.fetchall()]
+
+    if scope_kind == SCOPE_FAVORITES:
+        favorites, playlist = favorites, []
+    elif scope_kind == SCOPE_PLAYLIST:
+        favorites, playlist = [], playlist
 
     return EvidenceSet(
         user_id=user_id,
@@ -162,6 +197,80 @@ def resolve_user(connection, user_id: int, hidden_ids: set[int] | None = None) -
         playlist_ids=playlist,
         hidden_ids=set(hidden_ids or ()),
     )
+
+
+def scope_label(connection, user_id: int, scope_kind: str,
+                scope_ref: int | None) -> str:
+    """分析范围的可读名字。
+
+    【为什么要存进报告】歌单会改名、会被删。报告是历史快照 ——
+    它必须永远显示得出「这份是按哪张歌单生成的」，
+    而不是显示一个查不到的 id 或者一片空白。
+    """
+    if scope_kind == SCOPE_PLAYLIST:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT playlist_name FROM user_playlist_import "
+                "WHERE id = %s AND user_id = %s",
+                (scope_ref, user_id),
+            )
+            row = cursor.fetchone()
+        return row["playlist_name"] if row else f"已删除的歌单 #{scope_ref}"
+    return SCOPE_LABELS.get(scope_kind, scope_kind)
+
+
+def resolve_all_known(connection, user_id: int,
+                      hidden_ids: set[int] | None = None) -> tuple[set[int], set[int]]:
+    """用户**全部**曲目的 id 和艺人 id —— 不管这次分析的是哪个范围。
+
+    【为什么范围之外还要算一份】候选池必须排除用户已有的每一首歌，
+    探索配额也必须以「你真的没听过的歌手」为准。只用选中范围的会出两种错，
+    两种都不会报错：
+      · 分析「周杰伦精选」时，推荐「我喜欢的音乐」里已经有的歌
+      · 把陈奕迅算成「陌生歌手」—— 而用户在他那儿有 49 首，探索配额就废了
+
+    评估藏歌时这两个集合要一起减掉，否则藏歌会被当成「用户已知」，
+    候选池把它排除掉 —— 那 recall 就恒为 0 了。
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT track_id FROM (
+                SELECT track_id FROM favorite_track WHERE user_id = %s
+                UNION
+                SELECT matched_track_id AS track_id FROM user_playlist_track
+                 WHERE user_id = %s AND match_status = 'MATCHED'
+                   AND matched_track_id IS NOT NULL AND user_removed = 0
+            ) x
+            """,
+            (user_id, user_id),
+        )
+        ids = {row["track_id"] for row in cursor.fetchall()} - set(hidden_ids or ())
+        if not ids:
+            return set(), set()
+
+        # 【必须和 EnrichedTrack.artist_id 用同一个「主艺人」定义】——都是
+        # track_artist 里 id 最小的那条（入库顺序 = MusicBrainz 的 credit 顺序）。
+        #
+        # 第一版这里写的是「这首歌的全部艺人」，于是 user 34 得到 123 位，
+        # 而 ctx.tracks 算出来是 98 位：多出来的 25 位只以合作者身份出现过。
+        # 后果不会报错 —— content_score 里 `artist_id in known_artists` 判真，
+        # 合作者的歌白拿 0.6 分，novelty 也被扣掉。口径必须只有一个
+        placeholders = ",".join(["%s"] * len(ids))
+        cursor.execute(
+            f"""
+            SELECT DISTINCT ta.artist_id
+            FROM track_artist ta
+            WHERE ta.id IN (
+                SELECT MIN(ta2.id) FROM track_artist ta2
+                 WHERE ta2.track_id IN ({placeholders})
+                 GROUP BY ta2.track_id)
+            """,
+            list(ids),
+        )
+        artists = {row["artist_id"] for row in cursor.fetchall()}
+
+    return ids, artists
 
 
 def _to_tracks(rows) -> list[EnrichedTrack]:

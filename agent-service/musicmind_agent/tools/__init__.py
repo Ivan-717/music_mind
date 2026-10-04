@@ -14,7 +14,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from musicmind_agent.evidence import EvidenceSet, load_enriched, resolve_user
+from musicmind_agent.evidence import (
+    SCOPE_ALL,
+    EvidenceSet,
+    load_enriched,
+    resolve_all_known,
+    resolve_user,
+)
 from musicmind_agent.tools.base import (  # noqa: F401
     REGISTRY,
     ToolContext,
@@ -68,17 +74,27 @@ def build_context(
     connection,
     user_id: int,
     hidden_ids: set[int] | None = None,
+    scope_kind: str = SCOPE_ALL,
+    scope_ref: int | None = None,
 ) -> ToolContext:
     """把一个用户的数据取全。评估时传 hidden_ids 藏歌 ——
     藏一次，所有工具天然看不到，不用改任何工具。
+
+    scope_kind / scope_ref 决定**画像**看哪一批曲目（见 evidence.resolve_user）。
+    但 all_known_* 永远是整个曲库 —— 候选排除和探索判定不能跟着范围缩小，
+    理由见 evidence.resolve_all_known。
     """
-    evidence: EvidenceSet = resolve_user(connection, user_id, hidden_ids)
+    evidence: EvidenceSet = resolve_user(connection, user_id, hidden_ids,
+                                         scope_kind, scope_ref)
+    known_ids, known_artists = resolve_all_known(connection, user_id, hidden_ids)
     return ToolContext(
         connection=connection,
         evidence=evidence,
         tracks=load_enriched(connection, evidence.all_ids),
         mood_map=load_mood_map(connection),
         library_genre_counts=load_library_genre_counts(connection),
+        all_known_track_ids=known_ids,
+        all_known_artist_ids=known_artists,
     )
 
 

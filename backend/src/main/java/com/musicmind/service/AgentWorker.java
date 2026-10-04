@@ -189,9 +189,10 @@ public class AgentWorker implements SmartLifecycle {
 
     private void process(AgentRun run) {
         currentRunId = run.getId();
-        currentLabel = "report".equals(run.getKind())
-                ? "生成报告"
-                : "追问：" + abbreviate(run.getQuestion());
+        // 【标签里不能带问题原文】/api/agent/status 返回 currentLabel，而那个
+        // 端点对任何登录用户开放 —— 带上问题就等于把别人的追问片段广播出去。
+        // 它只需要说清「队列在忙什么」，不需要说忙的是谁问了什么
+        currentLabel = "report".equals(run.getKind()) ? "生成报告" : "回答追问";
         long startedAt = System.currentTimeMillis();
 
         // 【python 自己写状态】Java 这边不写 DONE / FAILED ——
@@ -212,13 +213,6 @@ public class AgentWorker implements SmartLifecycle {
 
         currentRunId = null;
         currentLabel = null;
-    }
-
-    private static String abbreviate(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.length() <= 24 ? s : s.substring(0, 24) + "…";
     }
 
     // ============================================================

@@ -34,6 +34,17 @@ public class AgentRun {
 
     private String provider;
 
+    /**
+     * 这一趟分析哪些曲目：all / favorites / playlist。
+     *
+     * 【为什么范围写在 run 上而不是靠参数传】Python 子进程只拿到一个 run-id，
+     * 它得自己去库里读这一趟该分析什么。参数多一条传递路径就多一处可能不一致。
+     */
+    private String scopeKind;
+
+    /** scopeKind=playlist 时是 user_playlist_import.id，其余为 null */
+    private Long scopeRef;
+
     /** QUEUED / RUNNING / DONE / FAILED */
     private String status;
 

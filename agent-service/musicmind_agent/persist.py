@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 
+from musicmind_agent.evidence import SCOPE_ALL, scope_label
 from musicmind_agent.graph import run_report
 
 # 【推荐条数别超过 20】
@@ -53,17 +54,27 @@ def mark_failed(connection, run_id: int, message: str) -> None:
 def run_and_persist(connection, run_id: int) -> int:
     """跑一次报告 → 落库 → 回填 run 行。返回 report_id。
 
-    返回 0 只可能是 run_id 不存在 —— 那种情况 caller 会当失败处理。
-    （第一版把「没抢到」也返回 0，而 Java 那边已经 claim 过了，
-    于是每一次都返回 0：子进程退出码 0、日志写着 RUN_OK、报告却没有。）
+    【run 行不存在要抛，不能返回 0】原来返回 0，而 cli 那边照打
+    `RUN_OK <id> report=0` 退出码 0 —— Java 认为跑成了，不做兜底
+    （finishFailed 只在子进程没跑成时调），那条 run 就停在 RUNNING，
+    等 600 秒后被 requeueStale 打回队列，然后原样再挂一次，无限循环。
+
+    「返回 0 让 caller 当失败处理」这句话原来的 docstring 里就写着，
+    但没有任何 caller 这么做 —— 注释描述的是意图，不是实现
     """
     run = load_run(connection, run_id)
     if run is None:
-        return 0
+        raise RuntimeError(f"agent_run 里没有 id={run_id} 的行，什么都没跑")
+
+    # 【范围从 run 行读，不从调用方传】Java 建行时就写好了，子进程只认这一份。
+    # 传参的话「Java 写的」和「Python 用的」会有两个来源，迟早对不上
+    scope_kind = run.get("scope_kind") or SCOPE_ALL
+    scope_ref = run.get("scope_ref")
 
     started = time.monotonic()
     final = run_report(connection, run["user_id"], run["provider"],
-                       out_dir=None, reco_count=RECO_COUNT)
+                       out_dir=None, reco_count=RECO_COUNT,
+                       scope_kind=scope_kind, scope_ref=scope_ref)
 
     rendered = final.get("rendered") or {}
     facts = final.get("facts") or {}
@@ -87,11 +98,15 @@ def run_and_persist(connection, run_id: int) -> int:
         cursor.execute(
             """
             INSERT INTO agent_report
-                (user_id, status, report_json, facts_json, data_scope_json, headline,
+                (user_id, status, scope_kind, scope_ref, scope_label,
+                 report_json, facts_json, data_scope_json, headline,
                  llm_provider, llm_model, tokens_in, tokens_out, latency_ms)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            (run["user_id"], status,
+            (run["user_id"], status, scope_kind, scope_ref,
+             # 【label 在这里定，不是入队时定】入队到出报告之间歌单可能已被改名。
+             # 报告要的是「生成这一刻它叫什么」
+             scope_label(connection, run["user_id"], scope_kind, scope_ref),
              json.dumps(rendered, ensure_ascii=False),
              json.dumps(facts, ensure_ascii=False, default=str),
              json.dumps(data_scope, ensure_ascii=False, default=str),

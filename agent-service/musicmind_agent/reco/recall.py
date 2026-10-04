@@ -45,9 +45,11 @@ def recall(tracks, all_tracks, profile, per_path: int = 40) -> dict[int, Recalle
 
     tracks      —— 用户的曲目（画像来源，**不含藏歌**）
     all_tracks  —— 全库（含藏歌 —— 藏歌必须能被推荐，否则 recall 恒为 0）
+    profile     —— 候选池按 profile.known_tracks 排除，**不是按 tracks 现算**。
+                   按一张歌单分析时两者不同：画像来自那张歌单，但候选要排除
+                   用户全部曲库里的歌，否则会推荐他在别的歌单里已经有的
     """
-    known = {t.track_id for t in tracks}
-    pool = [t for t in all_tracks if t.track_id not in known]
+    pool = [t for t in all_tracks if t.track_id not in profile.known_tracks]
 
     out: dict[int, Recalled] = {}
 
@@ -151,8 +153,15 @@ def mmr(items: list[Recalled], k: int, penalty_same_album: float = 0.15,
 
 
 def recommend(tracks, all_tracks, k: int = 20,
-              explore_quota: float = EXPLORE_QUOTA) -> list[Recalled]:
+              explore_quota: float = EXPLORE_QUOTA,
+              known_artist_ids: set[int] | None = None,
+              known_track_ids: set[int] | None = None) -> list[Recalled]:
     """推荐的确定性版本（不经过 LLM）。评估里的 content 基线就是它。
+
+    known_artist_ids / known_track_ids 是「用户整体已经有什么」。
+    不传就等同于 tracks 本身 —— 全量分析和评估走的是那条路。
+    下面「熟悉 / 陌生」的分组用的是 profile.known_artists，
+    而它现在可以比 tracks 更宽，正是为了按歌单分析时不动探索配额的语义。
 
     【为什么要把名额分成两半】这是评估逼出来的一个结论，不是拍脑袋。
 
@@ -174,7 +183,7 @@ def recommend(tracks, all_tracks, k: int = 20,
     **0.5 是两边都站得住的默认值**，而且它天然是个该交给用户的旋钮 ——
     「想多听点熟悉的」还是「想找点没听过的」是个人偏好，不该写死在代码里。
     """
-    profile = build_profile(tracks)
+    profile = build_profile(tracks, known_artist_ids, known_track_ids)
     merged = recall(tracks, all_tracks, profile)
     ranked = mmr(list(merged.values()), len(merged))
 
