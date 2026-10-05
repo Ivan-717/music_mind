@@ -64,3 +64,6 @@ LLM_PROVIDERS = {
         "max_tokens": int(os.getenv("QWEN_MAX_TOKENS", "3072")),
     },
 }
+
+# Wikipedia。**和 MusicBrainz 一样，他们要求 UA 里带联系方式**
+WIKI_USER_AGENT = os.getenv("WIKI_USER_AGENT") or MUSICBRAINZ_USER_AGENT
