@@ -138,5 +138,10 @@ def chunks_for(entity: dict) -> list[Chunk]:
                 "page_title": page.get("title"),
                 "chunk_index": i,
                 "chars": len(text),
+                # 【正文必须进 payload】它才是检索真正要拿的东西 ——
+                # 向量只负责「找到」，payload 才是「找到之后读什么」。
+                # 第一版漏了它：检索命中、分数好看、正文是空的，
+                # 而那种错在流水线上一路绿灯
+                "text": text,
             }))
     return out

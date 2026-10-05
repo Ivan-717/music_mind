@@ -31,7 +31,7 @@ from musicmind_agent.tools.base import (  # noqa: F401
 )
 
 # 导入即注册。工具函数靠 @register 装饰器把自己挂进 REGISTRY
-from musicmind_agent.tools import explore, library, profile  # noqa: F401,E402
+from musicmind_agent.tools import explore, knowledge, library, profile  # noqa: F401,E402
 
 CONFIDENCE_WEIGHT = {"high": 1.0, "medium": 0.6, "low": 0.2}
 

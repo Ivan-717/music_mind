@@ -26,19 +26,25 @@ for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
-import requests  # noqa: E402
+from datetime import datetime  # noqa: E402
+
 from qdrant_client import QdrantClient, models  # noqa: E402
 
 from musicmind_agent.chunk import chunks_for  # noqa: E402
 from musicmind_agent.config import PROJECT_ROOT  # noqa: E402
+# 【embed 从 knowledge 里拿，这里不再自己写一份】查询端用的是同一个函数 ——
+# 两边各写一份的话，改了一边忘另一边，向量就落在不同的空间里，
+# 而检索会静默地返回一堆不相干的东西
+from musicmind_agent.knowledge import EMBED_MODEL, MANIFEST, embed  # noqa: E402
+
 
 CORPUS_DIR = PROJECT_ROOT / "agent-service" / ".data" / "corpus"
 QDRANT_PATH = PROJECT_ROOT / "agent-service" / ".data" / "qdrant"
 COLLECTION = "musicmind_knowledge"
 
-OLLAMA_URL = "http://localhost:11434"
-EMBED_MODEL = "bge-m3"
-# 一次发几块。太小 → 上万块变成上万次 HTTP；太大 → 单次超时
+# 【EMBED_MODEL 不在这里定义】它归 knowledge.py —— 查询端要用同一个名字对清单，
+# 定义两份的话「对模型名」那道检查就成了摆设
+# 一次发几块。太小 → 上万块变成上千次 HTTP；太大 → 单次超时
 BATCH = 16
 
 
@@ -46,24 +52,20 @@ BATCH = 16
 # embedding：做成可替换的
 # ============================================================
 
-def embed(texts: list[str], model: str = EMBED_MODEL) -> list[list[float]]:
-    """一批文本 → 一批向量。
+def write_manifest(chunks: int, dim: int) -> None:
+    """索引建完之后写一份清单。
 
-    【为什么单独一个函数】embedding 的来源是这一步**唯一的未知数**
-    （实测 ollama pull 一开始卡在 TLS 上）。主流程不该知道它是 HTTP 还是 ONNX ——
-    换来源时只改这一个函数。
+    【为什么要有它】它挡的是「换了 embedding 模型但没重建索引」——
+    那种情况下向量落在不同的空间里，检索照样返回结果、分数照样 0.6 几，
+    **只是全部不相干**。没有任何东西会报警。
+
+    knowledge.search() 每次查之前先对这份清单里的模型名，对不上就拒绝返回。
     """
-    resp = requests.post(
-        f"{OLLAMA_URL}/api/embed",
-        json={"model": model, "input": texts},
-        timeout=600,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
-    data = resp.json()
-    if "error" in data:
-        raise RuntimeError(str(data["error"])[:200])
-    return data["embeddings"]
+    MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    MANIFEST.write_text(json.dumps({
+        "model": EMBED_MODEL, "dim": dim, "chunks": chunks,
+        "built_at": datetime.now().isoformat(timespec="seconds"),
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 # ============================================================
@@ -211,7 +213,17 @@ def run(kind: str, limit: int | None, status_only: bool) -> None:
           f"跳过 {skipped}  失败 {failed}")
     print(f"耗时 {(time.time() - started) / 60:.1f} 分钟")
     if client.collection_exists(COLLECTION):
-        print(f"collection 现在共 {client.count(COLLECTION).count} 块")
+        total = client.count(COLLECTION).count
+        print(f"collection 现在共 {total} 块")
+        # 【清单写的是索引【现在】的状态，不是这次跑了多少】
+        # 所以用 --limit 分段跑也不会写出一份骗人的清单
+        dim = 0
+        try:
+            vectors = client.get_collection(COLLECTION).config.params.vectors
+            dim = getattr(vectors, "size", 0) or 0
+        except Exception:
+            pass
+        write_manifest(total, dim)
     print("=" * 60)
 
 
