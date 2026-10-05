@@ -1,0 +1,30 @@
+# agent-service 的依赖。
+#
+# 【为什么现在才补】依赖一直是随手装进 .venv 的，没有这份清单 ——
+# 换台机器就复现不出来，而且「装过什么」只能靠 pip freeze 猜。
+# M5.3 加 qdrant-client 的时候顺手补上。
+#
+# 装法：
+#     python -m venv .venv
+#     .venv/Scripts/python.exe -m pip install -r requirements.txt
+#
+# 【不在这里的】embedding 走 Ollama 的 HTTP（bge-m3），不是 Python 包 ——
+# 这样模型落在 OLLAMA_MODELS（本机是 D 盘），不占 venv 所在的 C 盘。
+# 见 docs/m5-3-index-handoff.md
+
+pymysql
+python-dotenv
+requests
+zhconv
+
+# LangGraph 工作流（report 那条线）和它的 sqlite checkpoint
+langgraph
+langgraph-checkpoint-sqlite
+
+# 音频特征（30 秒 preview → arousal）
+librosa
+soundfile
+numpy
+
+# 向量库。**纯客户端**，不带 fastembed —— embedding 用 Ollama
+qdrant-client
