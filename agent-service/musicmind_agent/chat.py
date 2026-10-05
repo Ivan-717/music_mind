@@ -169,6 +169,7 @@ class CandidatePool:
         return self._by_index.get(index)
 
 
+
 def _number_rows(rows, pool: CandidatePool) -> list:
     """把工具行里的 track_id 换成一个全局序号。
 

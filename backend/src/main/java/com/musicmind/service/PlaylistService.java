@@ -9,7 +9,11 @@ import com.musicmind.vo.PlaylistVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +48,38 @@ public class PlaylistService {
         p.setIsPublic(Boolean.TRUE.equals(req.getIsPublic()));
         playlistMapper.insert(p);
         return playlistMapper.selectDetail(p.getId(), userId);
+    }
+
+    /**
+     * 用一批曲目新建一张歌单 —— **一次建好并灌满**。
+     *
+     * 给「把 Agent 的推荐存下来」用。歌单本身是用户侧的表，归 Spring Boot 写；
+     * Agent 那边只给 track_id 列表。
+     */
+    public Map<String, Object> createWithTracks(Long userId, String name, List<Long> trackIds) {
+        Playlist p = new Playlist();
+        p.setUserId(userId);
+        p.setName(name);
+        p.setIsPublic(false);
+        playlistMapper.insert(p);
+
+        // 先去重再查存在性。用户在对话里可能连着存两次同一批，
+        // 也可能某个 track_id 在库里已经被删了
+        List<Long> unique = new ArrayList<>(new LinkedHashSet<>(trackIds));
+        List<Long> existing = playlistMapper.selectExistingTrackIds(unique);
+
+        int added = 0;
+        for (Long trackId : existing) {
+            playlistMapper.addTrack(p.getId(), trackId);
+            added++;
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", p.getId());
+        out.put("name", name);
+        out.put("added", added);
+        out.put("skipped", unique.size() - added);
+        return out;
     }
 
     public PlaylistVO update(Long playlistId, Long userId, PlaylistRequest req) {

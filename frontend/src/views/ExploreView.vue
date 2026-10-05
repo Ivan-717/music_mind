@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream } from '@/api/chat'
+import { apiCreatePlaylistFromTracks } from '@/api/playlist'
 import { apiRunStatus } from '@/api/persona'
 import { useDisplay } from '@/composables/useDisplay'
 
@@ -58,6 +59,35 @@ const rendered = computed(() =>
 
 const fetching = ref(false)
 const fetched = ref('')
+
+// 把这一轮的推荐存成一张自己的歌单
+const saving = ref(false)
+const saved = ref('')
+
+async function savePlaylist(idx) {
+  const msg = rendered.value[idx]
+  const ids = (msg.recommendations || []).map((r) => r.track_id).filter(Boolean)
+  if (!ids.length || saving.value) return
+
+  // 默认名用**上一句问的话** —— 「推荐几首安静的」本身就是个好名字，
+  // 比从回答里截一段通顺得多
+  const prev = [...rendered.value.slice(0, idx)].reverse().find((m) => m.role === 'user')
+  const fallback = (prev?.answer || 'AI 推荐').replace(/\s+/g, ' ').slice(0, 24)
+  const name = window.prompt('歌单叫什么？', fallback)
+  if (!name || !name.trim()) return
+
+  saving.value = true
+  error.value = ''
+  try {
+    const r = await apiCreatePlaylistFromTracks(name.trim(), ids)
+    saved.value = `已存成歌单「${r.name}」，${r.added} 首`
+      + (r.skipped ? `（${r.skipped} 首库里已不存在，跳过）` : '')
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    saving.value = false
+  }
+}
 
 async function fetchAll(msg) {
   const list = msg.fetch_proposals || []
@@ -214,6 +244,7 @@ onMounted(async () => {
 
   <p v-if="error" class="err">{{ error }}</p>
   <p v-if="fetched" class="notice">{{ fetched }}</p>
+  <p v-if="saved" class="notice">{{ saved }}</p>
 
   <div v-if="pollStopped" class="err">
     <p>和服务器失去联系了（连着 {{ POLL_MAX_FAILURES }} 次没连上）。任务可能还在后台跑。</p>
@@ -232,7 +263,7 @@ onMounted(async () => {
   </p>
 
   <ul v-else class="chat-list">
-    <li v-for="m in rendered" :key="m.id" :class="m.role">
+    <li v-for="(m, mi) in rendered" :key="m.id" :class="m.role">
       <span class="who">{{ m.role === 'user' ? '我' : '分析' }}</span>
       <div class="body">
         <p class="text">{{ fmt(m.answer) }}</p>
@@ -246,6 +277,13 @@ onMounted(async () => {
             <p v-if="r.reason" class="reason">{{ fmt(r.reason) }}</p>
           </li>
         </ul>
+
+        <!-- 把推荐存成自己的歌单。用现成的歌单 CRUD，后端一次建好并灌满 -->
+        <p v-if="m.recommendations.length" class="save-row">
+          <button :disabled="saving" @click="savePlaylist(mi)">
+            {{ saving ? '保存中…' : `存成歌单（${m.recommendations.length} 首）` }}
+          </button>
+        </p>
 
         <!-- 库里没有、但上游有。**抓不抓由用户点** —— 不自动抓 -->
         <ul v-if="m.fetch_proposals.length" class="fetch-list">

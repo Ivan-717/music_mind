@@ -1,5 +1,6 @@
 package com.musicmind.controller;
 
+import com.musicmind.dto.PlaylistFromTracksRequest;
 import com.musicmind.dto.PlaylistRequest;
 import com.musicmind.security.CurrentUser;
 import com.musicmind.service.PlaylistService;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/playlists")
@@ -28,6 +30,13 @@ public class PlaylistController {
     @ResponseStatus(HttpStatus.CREATED)
     public PlaylistVO create(@Valid @RequestBody PlaylistRequest req) {
         return playlistService.create(CurrentUser.id(), req);
+    }
+
+    /** 用一批曲目直接建一张歌单。给「把 Agent 的推荐存下来」用 */
+    @PostMapping("/from-tracks")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> fromTracks(@Valid @RequestBody PlaylistFromTracksRequest req) {
+        return playlistService.createWithTracks(CurrentUser.id(), req.getName(), req.getTrackIds());
     }
 
     @GetMapping("/{id}")

@@ -77,6 +77,21 @@ public interface PlaylistMapper {
             """)
     List<PlaylistTrackVO> selectTracks(@Param("playlistId") Long playlistId);
 
+    /**
+     * 这批 id 里哪些在库里真实存在。
+     *
+     * 【先查再插，不靠外键抛异常】用 try/catch DataIntegrityViolationException
+     * 来「跳过脏 id」的话，异常会把事务搅浑，而且「跳过几个」和「整张失败」
+     * 这两种结果混在一起，调用方分不出来。
+     */
+    @Select("""
+            <script>
+            SELECT id FROM track WHERE id IN
+            <foreach collection="ids" item="i" open="(" separator="," close=")">#{i}</foreach>
+            </script>
+            """)
+    List<Long> selectExistingTrackIds(@Param("ids") List<Long> ids);
+
     // sort_order 自动取当前最大值 +1；重复加同一首不报错也不改顺序
     @Insert("""
             INSERT INTO playlist_track (playlist_id, track_id, sort_order)
