@@ -37,6 +37,10 @@ def search_knowledge(ctx: ToolContext, args: dict) -> ToolResult:
         facts={"knowledge.hits": len(hits),
                "knowledge.top_score": hits[0]["score"]},
         rows=[{
+            # 【单独给一列】路径解析要拿它去对「模型提到的名字有没有出处」。
+            # 埋在「来源」那串里的话就得解析字符串 —— 那种解析迟早被格式改动打脸
+            "名称": h["name"],
+            "类型": h["kind"],
             "来源": f"{h['kind']}／{h['page_title']}（{h['lang']}）",
             "相似度": h["score"],
             # 【截断】一块平均 700 字，5 条就是 3,500 字。全塞进 prompt

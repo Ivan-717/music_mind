@@ -89,6 +89,34 @@ async function savePlaylist(idx) {
   }
 }
 
+/**
+ * 抓路径上的一站。和 fetchAll 是同一个后端接口，只是只抓一张。
+ *
+ * title/artist 用后端从上游结果里取回来的那两个（`release_title` /
+ * `release_artist`），**不是模型写的** —— 模型写错的话用户会看到一张
+ * 名字不对的歌单，而抓的其实是另一张专辑。
+ */
+async function fetchOne(node) {
+  if (!node.release_mbid || fetching.value) return
+  fetching.value = true
+  error.value = ''
+  try {
+    const r = await apiFetchUpstream([{
+      releaseMbid: node.release_mbid,
+      title: node.release_title || node.name,
+      artist: node.release_artist || node.name
+    }])
+    const mins = Math.ceil((r.estimateSeconds || 0) / 60)
+    fetched.value = `已把《${node.release_title || node.name}》排进队列`
+      + (r.skippedQueued ? '（已经在队列里了）' : `，约 ${mins} 分钟`)
+      + '。抓完再问一次。'
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    fetching.value = false
+  }
+}
+
 async function fetchAll(msg) {
   const list = msg.fetch_proposals || []
   if (!list.length || fetching.value) return
@@ -267,6 +295,23 @@ onMounted(async () => {
       <span class="who">{{ m.role === 'user' ? '我' : '分析' }}</span>
       <div class="body">
         <p class="text">{{ fmt(m.answer) }}</p>
+
+        <!-- 探索路径。**它是「边」不是「点」** —— 站与站之间那句话才是路径的意义，
+             所以画成一条竖线串起来，而不是几个并列的卡片 -->
+        <ol v-if="m.path?.steps?.length" class="path-list">
+          <li v-for="s in m.path.steps" :key="s.order">
+            <div class="head">
+              <span class="step">{{ s.order }}</span>
+              <span class="name">{{ fmt(s.name) }}</span>
+              <span v-if="s.in_library" class="owned" title="你的库里已经有他/它的歌">已有</span>
+              <button v-else-if="s.release_mbid" class="grab"
+                      :disabled="fetching" @click="fetchOne(s)">抓进库里</button>
+            </div>
+            <!-- relation 是连到上一站的那条线，视觉上要像「边」不像「点」 -->
+            <p v-if="s.relation" class="relation">{{ fmt(s.relation) }}</p>
+            <p v-if="s.why_here" class="why">{{ fmt(s.why_here) }}</p>
+          </li>
+        </ol>
 
         <ul v-if="m.recommendations.length" class="rec-list compact">
           <li v-for="r in m.recommendations" :key="r.track_id" :data-track-id="r.track_id">

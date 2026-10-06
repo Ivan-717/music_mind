@@ -615,6 +615,40 @@ img { background: var(--bg-soft); }
 
 .explore-ask { margin-top: 0; }
 
+/* ===== 探索路径 =====
+   竖排的链路：左边一条线 + 每站一个圆点。线是「边」，不是装饰 ——
+   站与站之间的那段话才是路径本身的意义 */
+.path-list { list-style: none; margin: 16px 0 0; padding: 0 0 0 22px; position: relative; }
+.path-list > li { position: relative; padding: 0 0 20px 0; }
+.path-list > li:not(:last-child)::before {
+  content: ''; position: absolute; left: -16px; top: 14px; bottom: -4px;
+  width: 1px; background: var(--line);
+}
+.path-list > li::after {
+  content: ''; position: absolute; left: -19px; top: 7px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--bg);
+}
+.path-list .head { display: flex; align-items: baseline; gap: 9px; }
+.path-list .step { color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+.path-list .name { font-size: 15px; color: var(--text); }
+.path-list .owned {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--sage-bg); color: var(--sage);
+}
+.path-list .grab {
+  font-size: 11.5px; padding: 2px 10px; cursor: pointer;
+  border-radius: var(--radius-sm); border: 1px solid var(--line);
+  background: var(--bg-soft); color: var(--accent);
+}
+.path-list .grab:hover:not(:disabled) { border-color: var(--accent); }
+.path-list .grab:disabled { color: var(--mute); cursor: default; }
+/* 连到上一站的那句话，比 why_here 更弱一点 */
+.path-list .relation {
+  margin: 6px 0 0; font-size: 12.5px; color: var(--plum); line-height: 1.65;
+}
+.path-list .why { margin: 3px 0 0; font-size: 13px; color: var(--dim); line-height: 1.7; }
+
 .save-row { margin: 12px 0 0; }
 .save-row button {
   padding: 5px 16px; font-size: 12.5px; cursor: pointer;

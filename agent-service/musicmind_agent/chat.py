@@ -30,6 +30,8 @@ MAX_CHAT_ROUNDS = 6
 HISTORY_TURNS = 6
 # 一轮回答最多推几首
 MAX_RECO = 10
+# 探索路径最多几站。再多就不是「一条路」而是一份清单了
+MAX_PATH_STEPS = 6
 # 一次最多提议抓几张。和 Java 那边的 MAX_BATCH 对齐
 MAX_FETCH_PROPOSALS = 5
 
@@ -95,7 +97,26 @@ CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
 {"calls": [{"tool": "工具名", "args": {"参数": "值"}}]}
 
 直接回答：
-{"answer": "回答，数字写 {fact.key}", "recommendations": [{"candidate_index": 3, "reason": "为什么推它"}], "fetch_proposals": [{"release_mbid": "照抄 search_upstream 返回的", "why": "为什么建议抓这张"}]}
+{"answer": "回答，数字写 {fact.key}", "recommendations": [{"candidate_index": 3, "reason": "为什么推它"}], "fetch_proposals": [{"release_mbid": "照抄 search_upstream 返回的", "why": "为什么建议抓这张"}], "path": {"topic": "主题名", "steps": [{"order": 1, "name": "艺人或流派名", "kind": "artist|genre", "release_mbid": "要抓就填 search_upstream 返回过的那张，没有就 null", "why_here": "为什么这一站在这里", "relation": "和上一站的关系，第一站填 null"}]}}
+
+**`path` 只在用户说「我想了解 X」「从 X 开始」「带我入门」这类探索型请求时填**，
+3-6 站，最后一站通常是那个流派/运动本身（kind 填 genre）。
+别的问题一律给 null —— 一条只有一站的「路径」没有意义。
+
+**不要在 why_here / relation 里写「前面几站」「第 N 站」这种计数** ——
+站是可能被丢掉的（没出处的会被过滤），写死了就对不上。要指代就说名字。
+
+**即使这些东西你库里一首都没有，也要给 path。** 实测踩过：模型一看到
+「库里没有 Oasis」就说「那得先抓进来」，然后只给了抓取提议 —— 而用户问的是
+**怎么开始了解**，不是「帮我抓 Oasis」。路径正是「先看谁、再看谁」的答案，
+它和 `fetch_proposals` 是**一起用**的（路径告诉你顺序，提议让你把缺的抓进来），
+不是二选一。
+
+**每一站的 name 必须是你这次真的查过的** —— 语料条目里出现过的，
+或者 search_upstream 返回过的。**不要写你没查过的名字**，哪怕你很确定
+它属于这个流派：没查过就没有出处，会被丢掉。
+先调 `search_knowledge` 查这个主题（它是什么、有哪些代表艺人），
+必要时再调 `search_upstream` 找代表专辑 —— **然后才写 path**。
 
 **fetch_proposals 只在「用户问的东西库里没有、而 search_upstream 找到了候选」时填**，
 最多 5 条。`release_mbid` 只能照抄工具返回的，**不要自己编** —— 编出来的 id
@@ -272,6 +293,14 @@ def chat(connection, user_id: int, message: str,
     # search_upstream 返回的候选。它们没有 track_id（不在库里），
     # 所以 _number_rows 不会碰它们 —— 单独留一份给 fetch_proposals 用
     upstream_rows: list[dict] = []
+    # 【路径的出处名单】模型写 path 时提到的每一站，都得在这儿。
+    # 它对音乐史很熟，会顺手写没查过的名字 —— 那些是它脑子里的，不是我们的数据
+    knowledge_names: set[str] = set()
+    # 【正文也要留一份】出处判据是「这个名字出现在你查回来的内容里」，
+    # 不只是「它是个条目名」—— 实测踩过：语料命中的是「Britpop」那一页，
+    # 而 Blur/Suede/Pulp 是正文里提到的，只认条目名的话它们全被丢掉，
+    # 一条 6 站的路径只剩 2 站
+    knowledge_text: list[str] = []
 
     # 【必须先跑一遍核心工具】build_context 只把曲目装进 ctx，**不填 facts 仓**。
     # 报告那条路靠上一步的 compose 填过了，对话没有上一步 ——
@@ -309,6 +338,12 @@ def chat(connection, user_id: int, message: str,
                 used.append(name)
                 if name == "search_upstream":
                     upstream_rows.extend(result.rows)
+                if name == "search_knowledge":
+                    for r in result.rows:
+                        if r.get("名称"):
+                            knowledge_names.add(str(r["名称"]))
+                        if r.get("正文"):
+                            knowledge_text.append(str(r["正文"]))
                 blocks.append(_format_result(name, result.as_dict(), pool))
 
             messages.append({"role": "assistant",
@@ -327,11 +362,107 @@ def chat(connection, user_id: int, message: str,
                 "answer": render_text(text, ctx.facts, strict=False),
                 "recommendations": _resolve_recos(raw.get("recommendations"), pool, ctx),
                 "fetch_proposals": _resolve_proposals(raw.get("fetch_proposals"), upstream_rows, ctx),
+                "path": _resolve_path(raw.get("path"), knowledge_names, knowledge_text,
+                                      upstream_rows, ctx.connection, ctx.facts),
                 "used_tools": used,
             }
 
     return {"answer": "这个问题我查了几轮都没凑齐能回答的数据。",
             "recommendations": [], "fetch_proposals": [], "used_tools": used}
+
+
+def _in_library(connection, name: str, kind: str) -> bool:
+    """库里有没有这个艺人/流派。**由代码查，不由模型填** —— 它不知道库里有什么。
+
+    `REPLACE(name, ' ', '')` 是因为库里存的是 MusicBrainz 的原名
+    （「G.E.M. 鄧紫棋」），而模型很可能写「G.E.M.邓紫棋」。
+    """
+    table = "artist" if kind == "artist" else "genre"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT 1 FROM {table} "
+            f"WHERE REPLACE(name, ' ', '') = REPLACE(%s, ' ', '') LIMIT 1",
+            (name,))
+        return cursor.fetchone() is not None
+
+
+def _resolve_path(raw, knowledge_names: set[str], knowledge_text: list[str],
+                  upstream_rows: list[dict], connection, facts: dict) -> dict | None:
+    """把模型给的路径解析成一条可渲染的链路。没给、或者不足两站就返回 None。
+
+    **每一站的名字必须来自工具真返回过的内容。** 模型对音乐史很熟，
+    你让它「从 Oasis 讲 Britpop」，它会顺手写上 Pulp、Suede ——
+    而它根本没查过那些名字。和 fetch_proposals 是同一个问题、同一条解法：
+    只认名单里的，不认的就丢。
+
+    【这条防线保证什么】「你说的每一站都有出处」。
+    【不保证什么】「关系是真的」—— 「Blur 是 Oasis 的对位面」这句话对不对，
+    机器判不了。所以它是叙事，不是事实。
+    """
+    if not raw or not isinstance(raw, dict):
+        return None
+
+    from musicmind_agent.validate.normalize import name_matches
+
+    allowed = set(knowledge_names)
+    for row in upstream_rows:
+        allowed |= {str(row.get(k)) for k in ("artist", "title") if row.get(k)}
+    # mbid → 上游那一行的真名。**title/artist 从这儿取，不用模型写的** ——
+    # 抓取会拿它当「AI 帮你找的」那张歌单的行标题，模型写错的话
+    # 用户会看到一张名字不对的歌单，而抓的其实是另一张专辑
+    by_mbid = {r["release_mbid"]: r for r in upstream_rows if r.get("release_mbid")}
+
+    def known(name: str) -> bool:
+        """这个名字有没有出处。
+
+        三条路，任一条成立就算：
+          · 和某个**条目名**对得上（含繁简/空格归一）
+          · 和某个 **MusicBrainz 搜到的艺人/专辑名**对得上
+          · **出现在查回来的正文里** —— 这是最常走的一条：模型查「Britpop」
+            那一页，正文里提到 Oasis/Blur/Suede，那些名字是真实出现过的
+
+        【为什么第三条必须开】不开的话一条 6 站的路径会只剩 2 站，
+        而模型还会写「前面四站……」—— 用户看到的是断掉的路径
+        和一句对不上的话。
+
+        两个字的长度下限是为了挡噪声：太短的名字（「TC」）在长文里
+        几乎必然出现一次，那不叫出处。
+        """
+        if len(name) >= 2:
+            for text in knowledge_text:
+                if name in text:
+                    return True
+        return any(name_matches(name, n) or name_matches(n, name) for n in allowed)
+
+    steps: list[dict] = []
+    for item in (raw.get("steps") or [])[:MAX_PATH_STEPS]:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("name") or "").strip()
+        if not name or not known(name):
+            continue                      # 没出处的直接丢，不猜
+        kind = item.get("kind") if item.get("kind") in ("artist", "genre") else "artist"
+        steps.append({
+            "order": len(steps) + 1,      # 丢过站之后重排，不留空号
+            "name": name,
+            "kind": kind,
+            # 【只认上游真返回过的 mbid】模型见过一堆 uuid，会照着格式编一个，
+            # 而抓取会照着它去抓 —— 要么 404，要么抓到另一张专辑，
+            # 而且失败要等几分钟才看得到
+            "release_mbid": (item.get("release_mbid") or None)
+                            if item.get("release_mbid") in by_mbid else None,
+            "release_title": by_mbid.get(item.get("release_mbid") or "", {}).get("title"),
+            "release_artist": by_mbid.get(item.get("release_mbid") or "", {}).get("artist"),
+            "in_library": _in_library(connection, name, kind),
+            # 【也要过 render_text】和 reason / why 同一条规矩 ——
+            # 少一处就会漏出没渲染的 {fact.key}，M3 在 why 上栽过一次
+            "why_here": render_text(item.get("why_here") or "", facts, strict=False),
+            "relation": render_text(item.get("relation") or "", facts, strict=False) or None,
+        })
+
+    if len(steps) < 2:
+        return None                       # 一站的「路径」没有意义
+    return {"topic": raw.get("topic") or steps[-1]["name"], "steps": steps}
 
 
 def _resolve_proposals(items, upstream_rows: list[dict], ctx) -> list[dict]:
