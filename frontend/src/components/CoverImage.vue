@@ -17,6 +17,16 @@ const props = defineProps({
 
 const failed = ref(false)
 
+// 【必须告诉父组件】父组件可能想「这张没封面就别展示了」——
+// 而 failed 是这里的内部状态，外面看不见。不 emit 的话父组件只能
+// 自己再挂一次 @error，那就是两份实现
+const emit = defineEmits(['error'])
+
+function onError() {
+  failed.value = true
+  emit('error')
+}
+
 // albumId 变了要重置失败态：Vue Router 在同一条路由上换参数时
 // 会复用组件实例，不重置的话「上一张没封面」会一直粘着
 watch(() => props.albumId, () => {
@@ -35,7 +45,7 @@ watch(() => props.albumId, () => {
     :height="fill ? undefined : size"
     loading="lazy"
     decoding="async"
-    @error="failed = true"
+    @error="onError"
   />
   <div
     v-else

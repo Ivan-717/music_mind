@@ -2,14 +2,26 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   apiRequestReport, apiAsk, apiRunStatus,
-  apiMyReports, apiReportDetail,
+  apiMyReports, apiReportDetail, apiClaimType,
   apiAgentStatus, apiStopAgent, apiResumeAgent
 } from '@/api/persona'
 import { apiListImports } from '@/api/import'
-import { apiFavoriteIds } from '@/api/favorite'
+import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
+import { usePlayerStore } from '@/stores/player'
 import { useDisplay } from '@/composables/useDisplay'
 
 const { fmt } = useDisplay()
+const player = usePlayerStore()
+
+/** 推荐条目试听（有 has_preview 的才有按钮；旧报告没这个字段 → 不显示） */
+function playRec(r) {
+  player.play({
+    trackId: r.track_id,
+    name: r.name,
+    artistNames: r.artist_names,
+    albumId: r.album_id
+  })
+}
 
 /**
  * 分析范围：分析哪些曲目，而不是「分析哪张歌单」。
@@ -36,6 +48,30 @@ const provider = ref('deepseek')
 const scope = ref('all')          // 'all' | 'favorites' | 'playlist:<importId>'
 const playlists = ref([])         // 导入的歌单，带 matchedCount
 const favCount = ref(null)        // 收藏曲目数。拿不到就是 null，不显示计数
+
+// 推荐列表的收藏状态（2026-10-08）。**推荐列表原来只有 ▶，想收藏得跳到别的页** ——
+// 真实反馈根本流不进来（评估时发现 240 条推荐 0 收藏，不是推荐没人要，是没通道）
+const favIds = ref(new Set())
+const favBusy = ref(null)
+
+async function toggleFav(trackId) {
+  if (favBusy.value) return
+  favBusy.value = trackId
+  try {
+    if (favIds.value.has(trackId)) {
+      await apiUnfavorite(trackId)
+      favIds.value.delete(trackId)
+    } else {
+      await apiFavorite(trackId)
+      favIds.value.add(trackId)
+    }
+    favIds.value = new Set(favIds.value)   // 整体换新，模板里的 .has() 才重新求值
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    favBusy.value = null
+  }
+}
 const reports = ref([])
 const report = ref(null)          // { report: {...}, messages: [...] }
 const runId = ref(null)
@@ -97,6 +133,49 @@ function parseJson(maybe) {
 
 const body = computed(() => parseJson(report.value?.report?.report_json))
 const messages = computed(() => report.value?.messages || [])
+
+// ============================================================
+// 型（M8）：算出来的候选 + 用户认领的
+// ============================================================
+
+const showOther = ref(false)
+const claiming = ref(false)
+const claimError = ref('')
+
+const candidates = computed(() => body.value?.persona_type_candidates || [])
+const claimedName = computed(() => report.value?.report?.persona_type || '')
+
+/**
+ * 当前显示的型：认领过就用认领的，没认领就用系统算的最像那个。
+ * 【两种状态必须区分显示】「你认领的」和「系统猜的」不是一回事 ——
+ * 前者是用户的自我表达，后者只是算出来的。
+ * 认领的型不在新报告候选里时（换了范围重新生成），只显示名字、desc 空缺。
+ */
+const currentType = computed(() => {
+  const hit = candidates.value.find((c) => c.name === claimedName.value)
+  if (hit) return hit
+  if (claimedName.value) return { name: claimedName.value, desc: '' }
+  return candidates.value[0] || null
+})
+
+const otherTypes = computed(() =>
+  candidates.value.filter((c) => c.name !== currentType.value?.name))
+
+async function claimType(name) {
+  if (claiming.value || !report.value?.report?.id) return
+  claiming.value = true
+  claimError.value = ''
+  try {
+    await apiClaimType(report.value.report.id, name)
+    // 本地改掉就够了（不重取整份报告）—— report 是 ref 里的对象，深响应
+    report.value.report.persona_type = name
+    showOther.value = false
+  } catch (e) {
+    claimError.value = e.response?.data?.message || e.message
+  } finally {
+    claiming.value = false
+  }
+}
 
 /** 进度：已跑秒数 / 估计秒数。估计值只是给个参照，超了也不报错 */
 const progress = computed(() =>
@@ -170,6 +249,32 @@ const runningScopeLabel = computed(() => {
  *  用户看完报告可能已经改了下拉 */
 const reportScopeLabel = computed(() => report.value?.report?.scope_label || '')
 
+/** 当前打开的报告 id（历史下拉的值）。没打开报告时空串，下拉显示空白 */
+const currentReportId = computed(() => report.value?.report?.id ?? '')
+
+/**
+ * 历史下拉每一行的文案：意象名 · 日期。
+ * 【名字用 headline 列】它存的是意象名（「深夜书桌前的一盏台灯」）——
+ * 列表接口不拉 report_json（几十 KB × 每份），所以拿不到「型」。
+ * 没有名字的报告（失败/降级前的）退化成 #id。
+ */
+function historyLabel(r) {
+  const name = r.headline ? fmt(r.headline) : `报告 #${r.id}`
+  return `${name} · ${shortDate(r.created_at)}`
+}
+
+/** 后端给的是 LocalDateTime 的 ISO 串（2026-10-07T11:32:00）→ 10-07 11:32 */
+function shortDate(ts) {
+  if (!ts) return ''
+  const m = String(ts).match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : String(ts).slice(0, 10)
+}
+
+function onHistoryChange(e) {
+  const id = Number(e.target.value)
+  if (id) openReport(id)
+}
+
 /** 一份报告对应的下拉值。用于打开历史报告时把下拉切过去 */
 function scopeValueOf(rep) {
   if (!rep) return 'all'
@@ -186,7 +291,9 @@ async function loadScopeOptions() {
     playlists.value = []
   }
   try {
-    favCount.value = (await apiFavoriteIds()).length
+    const ids = await apiFavoriteIds()
+    favCount.value = ids.length
+    favIds.value = new Set(ids)     // 顺手给推荐列表的 ♡ 用，不再多查一次
   } catch (e) {
     favCount.value = null
   }
@@ -212,6 +319,8 @@ async function loadReports() {
 
 async function openReport(id) {
   error.value = ''
+  showOther.value = false
+  claimError.value = ''
   try {
     report.value = await apiReportDetail(id)
     runId.value = null
@@ -361,6 +470,7 @@ onMounted(async () => {
 
 <template>
   <h2>音乐人格</h2>
+  <div class="rule"></div>
 
   <p class="muted">
     基于你的收藏和歌单，分析口味并推荐本地库里你还没听过的歌。
@@ -385,7 +495,21 @@ onMounted(async () => {
     <button :disabled="busy || isRunning" @click="generate">
       {{ isRunning ? '分析中…' : '生成报告' }}
     </button>
-    <span v-if="reports.length" class="muted">历史 {{ reports.length }} 份</span>
+    <!-- 【历史报告要能点开】原来这里只是一个「历史 N 份」的死文字 ——
+         只能自动打开最新一份，更早的报告没有任何入口（用户报过）。
+         换成下拉：选中即打开 -->
+    <select
+      v-if="reports.length"
+      class="history-select"
+      :value="currentReportId"
+      :disabled="isRunning"
+      :title="`历史报告 ${reports.length} 份`"
+      @change="onHistoryChange"
+    >
+      <option v-for="r in reports" :key="r.id" :value="r.id">
+        {{ historyLabel(r) }}
+      </option>
+    </select>
   </div>
 
   <p v-if="error" class="err">{{ error }}</p>
@@ -429,13 +553,42 @@ onMounted(async () => {
   </p>
 
   <template v-else-if="body">
+    <!-- 限宽容器：报告是长文，900 的页面宽度一行 40+ 个中文字会串行。
+       720 是舒服的阅读宽度（见 style.css 的 .report-body） -->
+    <div class="report-body">
     <!-- 这份是基于哪批歌生成的。**用报告里的快照**，不是当前下拉的值 ——
          用户看完一份报告可能已经把下拉改了，显示当前值会张冠李戴 -->
     <p v-if="reportScopeLabel" class="scope-note">
       分析范围 · {{ reportScopeLabel }}
     </p>
 
-    <h3 class="section-title">{{ fmt(body.headline?.title) }}</h3>
+    <!-- 【型：报告的主角（M8）】固定池里算出来、认领后冻结。
+         意象名（headline）降为它下面的注脚 ——「类别 + 个性」两层 -->
+    <section v-if="currentType" class="ptype">
+      <div class="ptype-head">
+        <h3 class="ptype-name">{{ currentType.name }}</h3>
+        <span v-if="claimedName" class="ptype-tag owned">你认领的</span>
+        <span v-else class="ptype-tag guess">系统猜的</span>
+      </div>
+      <p v-if="currentType.desc" class="ptype-desc">{{ currentType.desc }}</p>
+
+      <p v-if="otherTypes.length" class="ptype-more">
+        <button v-if="!showOther" :disabled="claiming" @click="showOther = true">
+          {{ claimedName ? '换一个' : `不是这个？看看另外 ${otherTypes.length} 个` }}
+        </button>
+      </p>
+      <ul v-if="showOther" class="ptype-options">
+        <li v-for="t in otherTypes" :key="t.name">
+          <button :disabled="claiming" @click="claimType(t.name)">
+            <span class="opt-name">{{ t.name }}</span>
+            <span class="opt-desc">{{ t.desc }}</span>
+          </button>
+        </li>
+      </ul>
+      <p v-if="claimError" class="err">{{ claimError }}</p>
+    </section>
+
+    <h3 class="section-title persona-title">{{ fmt(body.headline?.title) }}</h3>
     <p class="muted">{{ fmt(body.headline?.subtitle) }}</p>
 
     <!-- 名字的依据。**这行是代码渲染的，不是模型写的** —— 名字是创作，
@@ -472,13 +625,30 @@ onMounted(async () => {
     <section v-if="(body.recommendations || []).length" class="persona-dim">
       <h4>推荐给你的 {{ body.recommendations.length }} 首</h4>
       <ul class="rec-list">
-        <li v-for="r in body.recommendations" :key="r.track_id" :data-track-id="r.track_id">
+        <li v-for="r in body.recommendations" :key="r.track_id" :data-track-id="r.track_id"
+            :class="{ playing: player.isCurrent(r.track_id) }">
           <div class="row">
+            <!-- 推荐的歌也能先试听 30 秒（没有试听源的不给按钮） -->
+            <button
+              v-if="r.has_preview"
+              class="play"
+              :class="{ on: player.isCurrent(r.track_id) }"
+              :title="player.isCurrent(r.track_id) && player.playing ? '暂停' : '试听 30 秒'"
+              @click="playRec(r)"
+            >{{ player.isCurrent(r.track_id) && player.playing ? '❚❚' : '▶' }}</button>
             <span class="name">{{ fmt(r.name) || ('#' + r.track_id) }}</span>
             <span class="artist">{{ fmt(r.artist_names || r.artist) }}</span>
             <span v-if="r.matched_dimensions?.length" class="why">
               {{ r.matched_dimensions.map((m) => DIM_LABEL[m] || m).join(' · ') }}
             </span>
+            <!-- 收藏通道：喜欢就直接收，不用跳去别的页 -->
+            <button
+              class="fav"
+              :class="{ on: favIds.has(r.track_id) }"
+              :disabled="favBusy === r.track_id"
+              :title="favIds.has(r.track_id) ? '取消收藏' : '加入收藏'"
+              @click="toggleFav(r.track_id)"
+            >{{ favIds.has(r.track_id) ? '★' : '☆' }}</button>
           </div>
           <!-- 「为什么推荐」和「和你过去喜欢的有什么关系」是这个功能的卖点，
                不是装饰。原则 4 要求推荐必须能解释，所以这两行不能省 -->
@@ -526,5 +696,6 @@ onMounted(async () => {
       </div>
       <p v-if="asking || (isRunning && run?.question)" class="muted">正在查数据回答…</p>
     </section>
+    </div>
   </template>
 </template>

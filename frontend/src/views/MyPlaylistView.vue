@@ -10,8 +10,21 @@ import {
   apiStopIngestion, apiResumeIngestion
 } from '@/api/ingestion'
 import { useDisplay } from '@/composables/useDisplay'
+import { usePlayerStore } from '@/stores/player'
 
 const { fmt, fmtDuration, providerLabel } = useDisplay()
+const player = usePlayerStore()
+
+/** 点 ▶：交给全局播放器。曲目用的是对齐后的本地 id（matchedTrackId），
+ *  未对齐的行没有 id、也没有按钮（v-if="t.hasPreview" 挡着） */
+function playTrack(t) {
+  player.play({
+    trackId: t.matchedTrackId,
+    name: t.title,
+    artistNames: t.artists,
+    coverUrl: t.coverUrl
+  })
+}
 
 const PAGE_SIZE = 50
 
@@ -507,6 +520,7 @@ watch(currentId, (id) => {
 
 <template>
   <h2>我的歌单</h2>
+  <div class="rule"></div>
 
   <p v-if="error" class="err">{{ error }}</p>
   <p v-if="ingestError" class="err">{{ ingestError }}</p>
@@ -648,7 +662,11 @@ watch(currentId, (id) => {
       </div>
 
       <ul class="my-track-list">
-        <li v-for="t in items" :key="t.id" :class="{ picked: selected.has(t.id) }">
+        <li
+          v-for="t in items"
+          :key="t.id"
+          :class="{ picked: selected.has(t.id), playing: player.isCurrent(t.matchedTrackId) }"
+        >
           <input
             class="pick"
             type="checkbox"
@@ -670,12 +688,24 @@ watch(currentId, (id) => {
           <span class="name">{{ fmt(t.title) }}</span>
           <span class="artist">{{ fmt(t.artists) }}</span>
           <span class="album">{{ fmt(t.albumName) }}</span>
+          <!-- 没有试听源的曲目【不给按钮】——给一个播不了的按钮比不给更糟 -->
+          <button
+            v-if="t.hasPreview"
+            class="play"
+            :class="{ on: player.isCurrent(t.matchedTrackId) }"
+            :title="player.isCurrent(t.matchedTrackId) && player.playing ? '暂停' : '试听 30 秒'"
+            @click="playTrack(t)"
+          >{{ player.isCurrent(t.matchedTrackId) && player.playing ? '❚❚' : '▶' }}</button>
+          <!-- 没试听的给同宽空位 —— 否则两行的列对不齐 -->
+          <span v-else class="play" aria-hidden="true"></span>
           <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
           <span class="state" :class="t.matchStatus.toLowerCase()">
             {{ statusLabel(t.matchStatus) }}
           </span>
 
-          <!-- 还没进本地库的才需要抓。抓完 status 变成「已收录」，这个按钮自己消失 -->
+          <!-- 还没进本地库的才需要抓。抓完 status 变成「已收录」，这个按钮自己消失。
+               已对齐的行给一个同宽空位 —— 否则「有时长列，有时没有」的两种行
+               连后面的 ♡ / ✕ 都对不齐（用户点名的问题，和 ▶ 同一类） -->
           <button
             v-if="!t.matchedTrackId"
             class="ingest"
@@ -686,6 +716,7 @@ watch(currentId, (id) => {
               : '去 MusicBrainz 找这张专辑并整张抓下来（约 7 秒）'"
             @click="ingestOne(t)"
           >{{ isIngesting(t.id) ? '抓取中' : '入库' }}</button>
+          <span v-else class="ingest-ghost" aria-hidden="true"></span>
 
           <button
             class="fav"

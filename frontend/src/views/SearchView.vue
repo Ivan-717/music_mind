@@ -7,9 +7,11 @@ import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import CoverImage from '@/components/CoverImage.vue'
 import { useDisplay } from '@/composables/useDisplay'
 import { useCoverIndex } from '@/composables/useCoverIndex'
+import { usePlayerStore } from '@/stores/player'
 
 const { fmt, fmtDuration } = useDisplay()
 const { withCover } = useCoverIndex()
+const player = usePlayerStore()
 const route = useRoute()
 
 const result = ref(null)
@@ -17,6 +19,16 @@ const favIds = ref(new Set())
 const loading = ref(false)
 const error = ref('')
 const busyId = ref(null)
+
+/** 点 ▶：交给全局播放器。没有 hasPreview 的行不渲染按钮 */
+function playTrack(t) {
+  player.play({
+    trackId: t.trackId,
+    name: t.name,
+    artistNames: t.artistNames,
+    albumId: t.albumId
+  })
+}
 
 async function search(q) {
   if (!q) {
@@ -152,6 +164,7 @@ watch(() => route.query.q, (q) => search(q))
 
   <template v-else>
     <h2>「{{ fmt(result.keyword) }}」</h2>
+    <div class="rule"></div>
     <p v-if="result.variants.length > 1" class="variants">
       已同时检索繁简两种写法：{{ result.variants.join(' / ') }}
     </p>
@@ -201,10 +214,24 @@ watch(() => route.query.q, (q) => search(q))
 
     <section v-if="activeTab === 'songs' && result.tracks.length" class="search-section">
       <ul class="track-list">
-        <li v-for="t in tracksView" :key="t.trackId">
+        <li v-for="t in tracksView" :key="t.trackId"
+            :class="{ playing: player.isCurrent(t.trackId) }">
           <CoverImage :album-id="t.albumId" :size="44" :alt="fmt(t.albumName)" />
           <span class="name">{{ fmt(t.name) }}</span>
           <span class="artist">{{ fmt(t.artistNames) }}</span>
+          <!-- 【加这一列】原来那行只有 封面/歌名/艺人/时长 四列，
+               而歌名是 flex:1 —— 短歌名会在中间留一大片空白。
+               补上专辑名既填了版面，也是搜歌时真的想看的信息 -->
+          <span class="album">{{ fmt(t.albumName) }}</span>
+          <!-- 有试听的给按钮；没有的给同宽空位 —— 否则两行的列对不齐 -->
+          <button
+            v-if="t.hasPreview"
+            class="play"
+            :class="{ on: player.isCurrent(t.trackId) }"
+            :title="player.isCurrent(t.trackId) && player.playing ? '暂停' : '试听 30 秒'"
+            @click="playTrack(t)"
+          >{{ player.isCurrent(t.trackId) && player.playing ? '❚❚' : '▶' }}</button>
+          <span v-else class="play" aria-hidden="true"></span>
           <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
           <button
             class="fav"

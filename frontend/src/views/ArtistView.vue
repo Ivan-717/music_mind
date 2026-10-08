@@ -1,16 +1,26 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { apiArtistDetail } from '@/api/artist'
 import CoverImage from '@/components/CoverImage.vue'
 import { useDisplay } from '@/composables/useDisplay'
 
 const { fmt } = useDisplay()
 const route = useRoute()
+const router = useRouter()
 
 const artist = ref(null)
 const loading = ref(true)
 const error = ref('')
+
+/**
+ * 和专辑详情同一个模式：回「来的地方」（主要是搜索结果），
+ * 直接打开链接（没有上一页）时兜底回专辑列表
+ */
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.replace('/albums')
+}
 
 async function load(id) {
   loading.value = true
@@ -38,6 +48,8 @@ watch(() => route.params.id, (id) => {
   <p v-else-if="!artist" class="err">{{ error || '歌手不存在' }}</p>
 
   <template v-else>
+    <button class="back-link" @click="goBack">← 返回</button>
+
     <div class="artist-head">
       <h2>{{ fmt(artist.name) }}</h2>
 

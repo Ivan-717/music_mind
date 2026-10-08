@@ -42,11 +42,10 @@ async function submit() {
 
 <template>
   <h2>导入歌单</h2>
+  <div class="rule"></div>
   <p class="hint">
-    把网易云或 QQ 音乐的歌单链接粘进来。歌单会<strong>整份存下来</strong>，
-    在<RouterLink to="/my-playlist">我的歌单</RouterLink>里能看到全部曲目（带封面）。
-    导入<strong>不会</strong>自动改你的收藏——想一次收完就勾上下面的选项，
-    也可以导完之后在歌单页里挑着收。
+    粘贴网易云或 QQ 音乐的歌单链接。整份存进
+    <RouterLink to="/my-playlist">我的歌单</RouterLink>，<strong>不会</strong>动你已有的收藏。
   </p>
 
   <div class="import-box">

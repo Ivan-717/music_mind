@@ -1,15 +1,38 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { apiAlbumDetail, apiAlbumTracks } from '@/api/album'
 import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import { useDisplay } from '@/composables/useDisplay'
+import { usePlayerStore } from '@/stores/player'
 import CoverImage from '@/components/CoverImage.vue'
 
 const { fmt, fmtDuration } = useDisplay()
 
 const route = useRoute()
+const router = useRouter()
+const player = usePlayerStore()
 const albumId = route.params.id
+
+/** 点 ▶：把这一首交给全局播放器（同一首再点 = 暂停/继续，store 里处理） */
+function playTrack(t) {
+  player.play({
+    trackId: t.trackId,
+    name: t.name,
+    artistNames: t.artistNames,
+    albumId: album.value?.id
+  })
+}
+
+/**
+ * 返回「来的地方」：从专辑列表点进来就回列表、从搜索结果/歌手页进来就回那里。
+ * window.history.state.back 是 vue-router 记的上一条路由 —— 为 null
+ * 说明是直接打开这个链接（没有上一页），兜底回专辑列表。
+ */
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.replace('/albums')
+}
 
 const album = ref(null)
 const tracks = ref([])
@@ -82,8 +105,10 @@ onMounted(async () => {
   <p v-else-if="!album" class="err">{{ error || '专辑不存在' }}</p>
 
   <template v-else>
+    <button class="back-link" @click="goBack">← 返回</button>
+
     <div class="album-head">
-      <CoverImage :album-id="album.id" :size="150" :alt="fmt(album.name)" />
+      <CoverImage :album-id="album.id" :size="240" :alt="fmt(album.name)" />
       <div class="album-head-text">
         <h2>{{ fmt(album.name) }}</h2>
         <p class="album-meta">
@@ -114,10 +139,21 @@ onMounted(async () => {
     <p v-else-if="tracks.length === 0" class="empty">这个版本没有曲目</p>
 
     <ul v-else class="track-list">
-      <li v-for="t in tracks" :key="t.trackId">
+      <li v-for="t in tracks" :key="t.trackId"
+          :class="{ playing: player.isCurrent(t.trackId) }">
         <span class="no">{{ t.trackNumber }}</span>
         <span class="name">{{ fmt(t.name) }}</span>
         <span class="artist">{{ fmt(t.artistNames) }}</span>
+        <!-- 没有试听源的曲目【不给按钮】——给一个播不了的按钮比不给更糟 -->
+        <button
+          v-if="t.hasPreview"
+          class="play"
+          :class="{ on: player.isCurrent(t.trackId) }"
+          :title="player.isCurrent(t.trackId) && player.playing ? '暂停' : '试听 30 秒'"
+          @click="playTrack(t)"
+        >{{ player.isCurrent(t.trackId) && player.playing ? '❚❚' : '▶' }}</button>
+        <!-- 没试听的给同宽空位 —— 否则两行的列对不齐 -->
+        <span v-else class="play" aria-hidden="true"></span>
         <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
         <button
           class="fav"

@@ -56,6 +56,14 @@ export const apiMyReports = () => http.get('/agent/reports')
  */
 export const apiReportDetail = (reportId) => http.get(`/agent/reports/${reportId}`)
 
+/**
+ * 认领一个「型」（M8）。name 必须在报告的候选列表里 ——
+ * 后端会校验（不在候选里返回 400），前端不做第二遍。
+ * 认领后冻结：重新生成报告也不变，除非再调一次换。
+ */
+export const apiClaimType = (reportId, name) =>
+  http.post(`/agent/reports/${reportId}/type`, { name })
+
 /** 队列状态（全局共享，和别人生成的任务一起排队） */
 export const apiAgentStatus = () => http.get('/agent/status')
 

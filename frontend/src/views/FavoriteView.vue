@@ -2,9 +2,21 @@
 import { ref, computed, onMounted } from 'vue'
 import { apiFavoritePage, apiUnfavorite } from '@/api/favorite'
 import { useDisplay } from '@/composables/useDisplay'
+import { usePlayerStore } from '@/stores/player'
 import CoverImage from '@/components/CoverImage.vue'
 
 const { fmt, fmtDuration } = useDisplay()
+const player = usePlayerStore()
+
+/** 点 ▶：交给全局播放器。没有 hasPreview 的行不渲染按钮 */
+function playTrack(it) {
+  player.play({
+    trackId: it.trackId,
+    name: it.name,
+    artistNames: it.artistNames,
+    albumId: it.albumId
+  })
+}
 
 const items = ref([])
 const total = ref(0)
@@ -63,6 +75,7 @@ onMounted(load)
 
 <template>
   <h2>我的收藏</h2>
+  <div class="rule"></div>
 
   <p v-if="loading">加载中…</p>
   <p v-else-if="error" class="err">{{ error }}</p>
@@ -70,7 +83,8 @@ onMounted(load)
 
   <template v-else>
     <ul class="fav-list">
-      <li v-for="it in items" :key="it.trackId">
+      <li v-for="it in items" :key="it.trackId"
+          :class="{ playing: player.isCurrent(it.trackId) }">
         <CoverImage :album-id="it.albumId" :size="44" :alt="fmt(it.albumName)" />
         <div class="body">
           <div class="row">
@@ -79,6 +93,15 @@ onMounted(load)
           </div>
           <div class="row meta">
             <span class="album">{{ fmt(it.albumName) || '—' }}</span>
+            <!-- 有试听的给按钮；没有的给同宽空位 —— 否则两行的列对不齐 -->
+            <button
+              v-if="it.hasPreview"
+              class="play"
+              :class="{ on: player.isCurrent(it.trackId) }"
+              :title="player.isCurrent(it.trackId) && player.playing ? '暂停' : '试听 30 秒'"
+              @click="playTrack(it)"
+            >{{ player.isCurrent(it.trackId) && player.playing ? '❚❚' : '▶' }}</button>
+            <span v-else class="play" aria-hidden="true"></span>
             <span class="dur">{{ fmtDuration(it.durationMs) }}</span>
             <span class="time">{{ fmtTime(it.favoritedAt) }}</span>
             <button :disabled="busyId === it.trackId" @click="remove(it.trackId)">

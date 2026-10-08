@@ -245,30 +245,49 @@ onMounted(async () => {
   if (conversations.value.length) await openConversation(conversations.value[0].id)
   loading.value = false
 })
+
+// 空态的点播单。点了直接就发 —— 「先点一下填进输入框、再按发送」
+// 是多出来的两步，没必要。四句都对应已验证的能力（见 docs/m2、m6 的验收）
+const PROMPTS = [
+  '我听得最多的是什么流派',
+  '推荐几首安静的',
+  '我想了解 Britpop',
+  '我喜欢 Radiohead，还可以听什么'
+]
+
+function usePrompt(t) {
+  if (busy.value || running.value) return
+  question.value = t
+  send()
+}
 </script>
 
 <template>
-  <h2>音乐探索</h2>
+  <div class="explore-head">
+    <h2>音乐探索</h2>
+    <div class="explore-bar">
+      <select
+        class="conv-select"
+        :value="current ?? ''"
+        :disabled="running"
+        @change="(e) => e.target.value === '' ? newConversation() : openConversation(Number(e.target.value))"
+      >
+        <option value="">＋ 新对话</option>
+        <option v-for="c in conversations" :key="c.id" :value="c.id">
+          {{ fmt(c.title) }}（{{ c.message_count }}）
+        </option>
+      </select>
+      <button :disabled="running" @click="newConversation">新对话</button>
+      <span class="muted">历史 {{ conversations.length }} 个</span>
+    </div>
+  </div>
+  <div class="rule"></div>
+  <!-- 正文限宽 720 —— 和人格报告同一条规则：长回答铺满 900 读起来累 -->
+  <div class="chat-body">
   <p class="muted">
     直接问，比如「我听得最多的是什么流派」「推荐几首安静的」。
     <strong>要跑 20-40 秒</strong>，问完可以离开这个页面。
   </p>
-
-  <div class="explore-bar">
-    <select
-      class="conv-select"
-      :value="current ?? ''"
-      :disabled="running"
-      @change="(e) => e.target.value === '' ? newConversation() : openConversation(Number(e.target.value))"
-    >
-      <option value="">＋ 新对话</option>
-      <option v-for="c in conversations" :key="c.id" :value="c.id">
-        {{ fmt(c.title) }}（{{ c.message_count }}）
-      </option>
-    </select>
-    <button :disabled="running" @click="newConversation">新对话</button>
-    <span class="muted">历史 {{ conversations.length }} 个</span>
-  </div>
 
   <p v-if="error" class="err">{{ error }}</p>
   <p v-if="fetched" class="notice">{{ fetched }}</p>
@@ -286,13 +305,20 @@ onMounted(async () => {
 
   <p v-if="loading" class="muted">加载中…</p>
 
-  <p v-else-if="!rendered.length && !running" class="empty">
-    还没有对话。下面问一句试试。
-  </p>
+  <!-- 空态 = 一份可以点的节目单，不是一句「还没有数据」 -->
+  <div v-else-if="!rendered.length && !running" class="explore-empty">
+    <p class="muted">还没有对话。今晚可以点这些，或者直接在下面打一行字：</p>
+    <ul class="prompt-list">
+      <li v-for="(t, i) in PROMPTS" :key="t">
+        <button :disabled="busy || running" @click="usePrompt(t)">
+          <span class="no">{{ String(i + 1).padStart(2, '0') }}</span>{{ t }}
+        </button>
+      </li>
+    </ul>
+  </div>
 
   <ul v-else class="chat-list">
     <li v-for="(m, mi) in rendered" :key="m.id" :class="m.role">
-      <span class="who">{{ m.role === 'user' ? '我' : '分析' }}</span>
       <div class="body">
         <p class="text">{{ fmt(m.answer) }}</p>
 
@@ -365,5 +391,6 @@ onMounted(async () => {
     <button :disabled="busy || running || !question.trim()" @click="send">
       {{ running ? '…' : '发送' }}
     </button>
+  </div>
   </div>
 </template>
