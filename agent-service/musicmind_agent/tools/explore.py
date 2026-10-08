@@ -303,7 +303,8 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
     all_tracks = load_all_enriched(ctx.connection)
     picked = recommend(ctx.tracks, all_tracks, limit,
                        known_artist_ids=ctx.all_known_artist_ids,
-                       known_track_ids=ctx.all_known_track_ids)
+                       known_track_ids=ctx.all_known_track_ids,
+                       known_name_keys=ctx.all_known_name_keys)
 
     chosen = [item for item in picked if item.track.track_id not in exclude]
     considered = len(all_tracks) - len(ctx.all_known_track_ids)
@@ -320,6 +321,10 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
             "艺人": item.track.artist_name, "专辑": item.track.album_name,
             "发行年": item.track.year, "流派": list(item.track.genres),
             "能量": item.track.arousal_measured,
+            # 这两个不给人看（prompt 白名单会挡掉），是映射时带给报告的：
+            # hasPreview → 推荐列表的 ▶；albumId → 播放条上的封面
+            "hasPreview": item.track.has_preview,
+            "albumId": item.track.album_id,
             "总分": round(item.score.get("total", 0), 3),
             "分量": {k: round(v, 2) for k, v in item.score.items()
                      if k not in ("total", "mmr_total", "mmr_penalty") and v},

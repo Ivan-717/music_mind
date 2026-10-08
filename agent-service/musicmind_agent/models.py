@@ -57,6 +57,10 @@ class Recommendation(BaseModel):
     """
 
     candidate_index: int          # 1-based，对应 prompt 里候选列表的序号
+    name: str = ""                # 候选行里的歌名，原样抄。
+                                  # 【映射时按名字反查优先】实测模型会数错序号
+                                  # （报告 30：20 条里前 8 条整体错开一行），
+                                  # 但「抄歌名」这件事它可靠得多。见 nodes._map_candidates
     reason: str
     matched_dimensions: list[str] = Field(default_factory=list)   # 会被回查证实
     relation_to_history: RelationToHistory = Field(default_factory=RelationToHistory)
@@ -83,6 +87,7 @@ class Headline(BaseModel):
 class ReportDraft(BaseModel):
     """LLM 直接产出的东西。渲染和验证在这之后做。"""
     headline: Headline
+    opening: str = ""            # ← 新增：开场白（2-4 句），渲染/校验收口见 P5/P6
     dimensions: list[Dimension] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)

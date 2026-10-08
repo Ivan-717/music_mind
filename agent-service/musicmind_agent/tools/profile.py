@@ -510,3 +510,63 @@ def mood_energy_profile(ctx: ToolContext, args: dict) -> ToolResult:
             "报告里不允许把推断值当实测值说",
         ),
     )
+
+# ============================================================
+# 地区
+# ============================================================
+
+# 华语区的国家码（MusicBrainz 用的是 ISO 3166-1 alpha-2）
+MANDARIN_CODES = {"CN", "TW", "HK"}
+
+
+@register(
+    "region_distribution", 0,
+    "艺人国家/地区的分布。反映的是「作品来自哪儿」，不是用户在哪听",
+    {},
+)
+def region_distribution(ctx: ToolContext, args: dict) -> ToolResult:
+    tracks = ctx.tracks
+    total = len(tracks)
+    with_code = [t for t in tracks if t.country_code]
+    base = len(with_code)     # 【分母是有国家码的曲目，不是全部】覆盖率要诚实披露
+
+    counts: Counter = Counter()
+    examples: dict[str, list] = {}
+    for t in with_code:
+        counts[t.country_code] += 1
+        examples.setdefault(t.country_code, [])
+        if len(examples[t.country_code]) < 2:
+            examples[t.country_code].append(t)
+
+    mandarin = sum(n for c, n in counts.items() if c in MANDARIN_CODES)
+
+    facts = {
+        "region.with_code_ratio": round(base / total, 4) if total else 0,
+        "region.mandarin_tracks": mandarin,
+        "region.mandarin_share": round(mandarin / base, 4) if base else 0,
+        "region.non_mandarin_share": round((base - mandarin) / base, 4) if base else 0,
+        "region.distinct": len(counts),
+    }
+    for code, n in counts.most_common(8):
+        facts[f"region.{code}.tracks"] = n
+        facts[f"region.{code}.share"] = round(n / base, 4) if base else 0
+
+    return ToolResult(
+        tool="region_distribution",
+        facts=facts,
+        rows=[
+            {"地区": code, "曲目数": n,
+             "占比": f"{n / base * 100:.1f}%" if base else "0%"}
+            for code, n in counts.most_common(8)
+        ],
+        evidence=cap_evidence([
+            ctx.evidence_for(t, why=f"{code} 地区")
+            for code, _ in counts.most_common(8)
+            for t in examples.get(code, [])
+        ]),
+        coverage=cov(
+            total, base,
+            "艺人国家码缺失的曲目不参与；它反映的是作品来自哪里，"
+            "不是用户在哪里听 —— 库里没有播放行为数据",
+        ),
+    )

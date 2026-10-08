@@ -94,6 +94,12 @@ def run_and_persist(connection, run_id: int) -> int:
     data_scope = {k: v for k, v in facts.items()
                   if k.startswith(("scope.", "coverage."))}
 
+    # 「型」是代码算的，和 facts 一样是数据 —— 不经过 LLM、不进验证链。
+    # 放在 persist 里而不是 graph 节点里：正常/降级两条路径都会经过这里，
+    # 一处就全覆盖了
+    from musicmind_agent.persona_types import score_types
+    rendered["persona_type_candidates"] = score_types(facts)
+
     with connection.cursor() as cursor:
         cursor.execute(
             """

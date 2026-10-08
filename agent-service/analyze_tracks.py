@@ -80,15 +80,27 @@ def load_aliases(connection) -> dict[int, tuple[str, ...]]:
     return {k: tuple(v) for k, v in aliases.items()}
 
 
-def load_targets(connection, limit: int | None, reanalyze: bool) -> list[dict]:
+def load_targets(connection, limit: int | None, reanalyze: bool,
+                 all_tracks: bool = False) -> list[dict]:
     """选出要分析的曲目。
 
-    目标是「画像的输入」：出现在某个用户歌单里且已对齐的曲目，加上被收藏过的。
-    推荐候选池不在这里 —— 它们暂时只有流派推断，没有实测特征。
+    默认目标是「画像的输入」：出现在某个用户歌单里且已对齐的曲目，加上被收藏过的。
+    --all 时改为全库 —— 目录里任何一张专辑点进去都有大概率能试听，
+    代价是约 3 小时（iTunes 限速 2.5 秒/首，全库 4000+ 首）。
     """
     already_done = "" if reanalyze else (
         "AND t.id NOT IN (SELECT track_id FROM track_audio_feature)"
     )
+
+    # 【默认口径：画像的输入】--all 时这个条件整段去掉
+    scope = "" if all_tracks else """
+          AND t.id IN (
+                SELECT matched_track_id FROM user_playlist_track
+                WHERE match_status = 'MATCHED' AND matched_track_id IS NOT NULL
+                  AND user_removed = 0
+                UNION
+                SELECT track_id FROM favorite_track
+              )"""
 
     # 【主艺人取 track_artist 里 id 最小的那条】
     # 一张表里一首歌可能有多个艺人（《珊瑚海》= 周杰倫 & 梁心頤），
@@ -102,13 +114,8 @@ def load_targets(connection, limit: int | None, reanalyze: bool) -> list[dict]:
                 SELECT MIN(ta2.id) FROM track_artist ta2 WHERE ta2.track_id = t.id
              )
         JOIN artist ar ON ar.id = ta.artist_id
-        WHERE t.id IN (
-                SELECT matched_track_id FROM user_playlist_track
-                WHERE match_status = 'MATCHED' AND matched_track_id IS NOT NULL
-                  AND user_removed = 0
-                UNION
-                SELECT track_id FROM favorite_track
-              )
+        WHERE 1 = 1
+          {scope}
           {already_done}
           AND t.id NOT IN (
                 SELECT track_id FROM track_audio_analysis_fail WHERE permanent = 1
@@ -142,6 +149,12 @@ def record_failure(connection, track_id: int, reason: str) -> None:
 def save_feature(connection, track_id: int, feature: F.AudioFeature,
                  preview_url: str, artist_verified: bool) -> None:
     row = feature.as_row()
+    # 【键名对齐表列名】dataclass 的字段叫 arousal，表的列叫 arousal_measured
+    # （列名历史更久，不改它）。不映射的话，下面的占位符 %(arousal_measured)s
+    # 找不到键 —— 报 KeyError: 'arousal_measured'。2026-10-07 重跑时炸出来的：
+    # 字段是后来改名成 arousal 的，这个脚本一直没再跑过，就潜伏了一周多。
+    # **改 features.py 字段名时，记得回来对一遍这几个占位符。**
+    row["arousal_measured"] = row.pop("arousal")
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -175,6 +188,9 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--reanalyze", action="store_true",
                         help="连算过的也重算（换算法版本后用）")
+    parser.add_argument("--all", action="store_true",
+                        help="全库模式：所有曲目都跑（默认只跑用户歌单+收藏）。"
+                             "约 3 小时，可断点续跑")
     args = parser.parse_args()
 
     session = requests.Session()
@@ -182,7 +198,7 @@ def main() -> int:
 
     connection = get_connection()
     aliases = load_aliases(connection)
-    targets = load_targets(connection, args.limit, args.reanalyze)
+    targets = load_targets(connection, args.limit, args.reanalyze, args.all)
 
     stats = Stats()
     # 目标查询已经排除了算过的，这里的 skipped 只在 --reanalyze 时有意义

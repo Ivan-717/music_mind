@@ -86,7 +86,8 @@ def build_context(
     """
     evidence: EvidenceSet = resolve_user(connection, user_id, hidden_ids,
                                          scope_kind, scope_ref)
-    known_ids, known_artists = resolve_all_known(connection, user_id, hidden_ids)
+    known_ids, known_artists, known_name_keys = resolve_all_known(
+        connection, user_id, hidden_ids)
     return ToolContext(
         connection=connection,
         evidence=evidence,
@@ -95,6 +96,7 @@ def build_context(
         library_genre_counts=load_library_genre_counts(connection),
         all_known_track_ids=known_ids,
         all_known_artist_ids=known_artists,
+        all_known_name_keys=known_name_keys,
     )
 
 

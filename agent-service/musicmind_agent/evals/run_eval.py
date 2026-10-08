@@ -66,6 +66,9 @@ def main() -> int:
     try:
         full = build_context(connection, args.user)
         all_tracks = load_all_enriched(connection)
+        # novelty 的对照集 = 用户全部曲目（含藏起来的那部分）——
+        # 藏歌不在画像里，但对用户来说仍然是「已经有的」
+        known_ids = {t.track_id for t in full.tracks}
         folds = (splits.artist_cold_folds if args.kind == "artist_cold"
                  else splits.random_item_folds)(full.tracks, args.folds)
 
@@ -76,6 +79,13 @@ def main() -> int:
             # 【画像用减掉藏歌之后的曲目；候选用全库】—— 这两个集合不一样，
             # 混用就是泄露。下面每个 baseline 都只拿 profile_tracks 建画像
             profile_tracks = [t for t in full.tracks if t.track_id not in fold.hidden_ids]
+
+            # 【lift 的 0 点基准】同一折现算一次 random 的命中。
+            # 藏歌占全库比例越高、random 白拿的越多 —— artist_cold 上它甚至
+            # 反超 content（2026-10-08）。不看提升只看绝对值，
+            # 会把「白拿」当成「有效」。分母用现算的，不用历史数字
+            random_ids = baselines.random_pick(all_tracks, profile_tracks, args.k)
+            recall_random = metrics.recall_at_k(random_ids, fold.hidden_ids, args.k)
 
             ceil_ok, ceil_total = splits.ceiling(
                 fold, all_tracks,
@@ -161,6 +171,12 @@ def main() -> int:
                         "占上界比": round(
                             metrics.recall_at_k(ids, fold.hidden_ids, k) / max_recall, 4
                         ) if max_recall else 0,
+                        # ---- v2 新增（2026-10-08）：详见 metrics.py 各自的注释 ----
+                        "recall_random": round(recall_random, 4),
+                        "lift": round(metrics.lift_over_random(
+                            metrics.recall_at_k(ids, fold.hidden_ids, k),
+                            recall_random, max_recall), 4),
+                        "novelty": round(metrics.novelty_at_k(ids, known_ids, k), 4),
                         "有效": "否" if invalid else "是",
                         "无效原因": invalid,
                         **extra,
@@ -169,6 +185,7 @@ def main() -> int:
                     print(f"  {row['切分'][:24]:26} {system:14} {provider:9} "
                           f"recall@{k}={row[f'recall@{k}']:.3f}  "
                           f"上界={max_recall:.3f}  占上界={row['占上界比']*100:5.1f}%  "
+                          f"lift={row['lift']*100:5.0f}%  novelty={row['novelty']*100:3.0f}%  "
                           f"hit={row[f'hit@{k}']}")
     finally:
         connection.close()
@@ -189,7 +206,7 @@ def main() -> int:
     # 汇总：每个系统跨折的均值，并带上天花板
     k = args.k
     print(f"\n按系统汇总（跨折均值，k={k}）：")
-    print(f"  {'系统':16}{'recall':>9}{'上界':>9}{'占上界':>9}{'hit':>7}")
+    print(f"  {'系统':16}{'recall':>9}{'上界':>9}{'占上界':>9}{'lift':>8}{'novelty':>9}{'hit':>7}")
     for system in systems:
         subset = [r for r in rows if r["系统"] == system]
         if not subset:
@@ -205,12 +222,16 @@ def main() -> int:
         avg = sum(r[f"recall@{k}"] for r in valid) / n
         bound = sum(r["recall上界"] for r in valid) / n
         hit = sum(r[f"hit@{k}"] for r in valid) / n
+        lift = sum(r.get("lift", 0) for r in valid) / n
+        nov = sum(r.get("novelty", 0) for r in valid) / n
         pct = f"{avg / bound * 100:.1f}%" if bound else "—"
         note = f"  （{skipped} 折无效，已排除）" if skipped else ""
-        print(f"  {system:16}{avg:9.4f}{bound:9.4f}{pct:>9}{hit:7.2f}{note}")
+        print(f"  {system:16}{avg:9.4f}{bound:9.4f}{pct:>9}{lift*100:7.0f}%{nov*100:8.0f}%{hit:7.2f}{note}")
     print()
     print("【怎么读】recall@k 的上界不是 1 —— 藏 N 首只推 k 首时上界是 min(可检索, k)/N。")
-    print("          「占上界」才是能跨 k、跨切分比较的那个数。")
+    print("          lift = 相对 random 的提升（0=瞎猜 1=吃满上界）；")
+    print("          novelty = 推的歌里「用户没有的」占比 —— 三个一起看，")
+    print("          单独任何一列都会被另一种策略骗（详见 metrics.py）。")
     return 0
 
 

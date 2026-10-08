@@ -67,6 +67,7 @@ class EnrichedTrack:
 
     arousal_measured: float | None
     artist_verified: bool
+    has_preview: bool = False     # 有没有 30 秒试听（track_audio_feature.preview_url）
 
     @property
     def year(self) -> int | None:
@@ -129,7 +130,7 @@ _ENRICH_SQL = f"""
            (SELECT GROUP_CONCAT(g.name)
               FROM artist_genre ag JOIN genre g ON g.id = ag.genre_id
              WHERE ag.artist_id = ar.id) AS artist_genres,
-           af.arousal_measured, af.artist_verified
+           af.arousal_measured, af.artist_verified, af.preview_url
     FROM track t
     {_PRIMARY_ARTIST}
     {_ALBUM_PICK}
@@ -220,8 +221,9 @@ def scope_label(connection, user_id: int, scope_kind: str,
 
 
 def resolve_all_known(connection, user_id: int,
-                      hidden_ids: set[int] | None = None) -> tuple[set[int], set[int]]:
-    """用户**全部**曲目的 id 和艺人 id —— 不管这次分析的是哪个范围。
+                      hidden_ids: set[int] | None = None
+                      ) -> tuple[set[int], set[int], set[tuple[str, str]]]:
+    """用户**全部**曲目的 id、艺人 id、名字键 —— 不管这次分析的是哪个范围。
 
     【为什么范围之外还要算一份】候选池必须排除用户已有的每一首歌，
     探索配额也必须以「你真的没听过的歌手」为准。只用选中范围的会出两种错，
@@ -231,23 +233,43 @@ def resolve_all_known(connection, user_id: int,
 
     评估藏歌时这两个集合要一起减掉，否则藏歌会被当成「用户已知」，
     候选池把它排除掉 —— 那 recall 就恒为 0 了。
+
+    【第三个集合：名字键，为什么不能只靠 track_id】库里同一首歌有多条
+    MBID 条目（「绅士」有 14265 / 14268 两条，同名同艺人）。known_track_ids
+    只排掉用户对齐上的那一条，另一条照样进候选 —— 用户看到「我歌单里有这首」
+    又被推一次（2026-10-07 实测被当场指出）。所以再加 (归一歌名, 归一主艺人)
+    的集合；只按歌名会误杀同名不同曲（队长的《哪里都是你》不该挡掉周杰伦的）。
     """
+    from musicmind_agent.validate.normalize import name_key
+
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT track_id FROM (
+            SELECT x.track_id, t.name AS track_name, ar.name AS artist_name
+            FROM (
                 SELECT track_id FROM favorite_track WHERE user_id = %s
                 UNION
                 SELECT matched_track_id AS track_id FROM user_playlist_track
                  WHERE user_id = %s AND match_status = 'MATCHED'
                    AND matched_track_id IS NOT NULL AND user_removed = 0
             ) x
+            JOIN track t ON t.id = x.track_id
+            LEFT JOIN track_artist ta ON ta.id = (
+                SELECT MIN(ta2.id) FROM track_artist ta2 WHERE ta2.track_id = t.id)
+            LEFT JOIN artist ar ON ar.id = ta.artist_id
             """,
             (user_id, user_id),
         )
-        ids = {row["track_id"] for row in cursor.fetchall()} - set(hidden_ids or ())
+        rows = cursor.fetchall()
+        ids = {row["track_id"] for row in rows} - set(hidden_ids or ())
+        # 【和 EnrichedTrack.artist_name 同一个「主艺人」定义】MIN(ta.id)，
+        # 两边口径必须一致，否则「同名同人」判定会漏
+        name_keys = {
+            (name_key(row["track_name"]), name_key(row["artist_name"]))
+            for row in rows if row["track_id"] in ids
+        }
         if not ids:
-            return set(), set()
+            return set(), set(), set()
 
         # 【必须和 EnrichedTrack.artist_id 用同一个「主艺人」定义】——都是
         # track_artist 里 id 最小的那条（入库顺序 = MusicBrainz 的 credit 顺序）。
@@ -270,7 +292,7 @@ def resolve_all_known(connection, user_id: int,
         )
         artists = {row["artist_id"] for row in cursor.fetchall()}
 
-    return ids, artists
+    return ids, artists, name_keys
 
 
 def _to_tracks(rows) -> list[EnrichedTrack]:
@@ -295,6 +317,7 @@ def _to_tracks(rows) -> list[EnrichedTrack]:
                 float(row["arousal_measured"]) if row["arousal_measured"] is not None else None
             ),
             artist_verified=bool(row["artist_verified"]),
+            has_preview=bool(row["preview_url"]),
         )
         for row in rows
     ]

@@ -46,6 +46,7 @@ def walk_texts(report: dict):
     head = report.get("headline") or {}
     yield "headline.title", head.get("title") or ""
     yield "headline.subtitle", head.get("subtitle") or ""
+    yield "opening", report.get("opening") or ""  # ← 新增。这个函数漏一个字段就是一个洞
 
     for path, claim in walk_claims(report):
         yield f"{path}.text", claim.get("text") or ""

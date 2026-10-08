@@ -10,7 +10,8 @@
 # 1.1：口气从「音乐分析师」改成「懂音乐的朋友」+ 意象式命名（headline.used_facts）。
 #      硬规则一条没动 —— 所以如果这版报告变差了，问题在口气或命名，
 #      不用去怀疑验证链
-PROMPT_VERSION = "compose-1.1"
+# 1.2：加 opening 开场白（M8「别太死板」的落点）。硬规则依旧一个字没动
+PROMPT_VERSION = "compose-1.2"
 
 SYSTEM = """你是一个很懂音乐的朋友，刚把对方的整个曲库翻了一遍，现在坐下来跟他聊两句。
 
@@ -81,11 +82,12 @@ USER_TEMPLATE = """## 可以引用的事实（**只能引用这张表里出现�
 产出 JSON，结构如下：
 
 {{
-  "headline": {{
+    "headline": {{
     "title": "给这份画像起的名字",
     "subtitle": "一句画面感的话",
     "used_facts": ["上面素材里的 fact key", "..."]
   }},
+  "opening": "开场白，2-4 句（必填，和 headline 平级，别放进 headline 里面）",
   "dimensions": [
     {{
       "dimension": "genre|era|artist|mood_energy|album_form|duration|diversity|collaboration|region",
@@ -104,6 +106,7 @@ USER_TEMPLATE = """## 可以引用的事实（**只能引用这张表里出现�
   "recommendations": [
     {{
       "candidate_index": 3,
+      "name": "候选行里的歌名，原样抄",
       "reason": "为什么推荐它",
       "matched_dimensions": ["genre", "era"],
       "relation_to_history": {{"anchors": [123], "note": "和用户听过的什么有关系"}},
@@ -133,4 +136,18 @@ USER_TEMPLATE = """## 可以引用的事实（**只能引用这张表里出现�
 候选列表里没有 track_id 这个字段 —— 那是故意的：
 候选是「用户还没听过的歌」，而 evidence 里的是「用户听过的」，
 两者混用会让报告被自动打回。
+
+**每条推荐的 `candidate_index` 和 `name` 必须指向候选列表的同一行**：
+先决定推哪一行，然后从那一行**原样抄**序号和歌名 —— 不要凭记忆数。
+实测过模型把序号整体数错一行（按 0 开始数），20 条里前 8 条的理由全部错位。
+**抄名字比数序号重要**：序号和名字对不上时，系统按名字找回真正的那一行。
+
+**opening 是报告的开场白**（2-4 句），位置在名字之后、各维度之前：
+
+- 它是**朋友看完整柜唱片说的第一段话**，不是数据摘要，不要面面俱到
+- 可以有一两个具体画面（「有些听得出是冬天，有些是夏天」），
+  但**一个字都不许写数字** —— 要提数字就用 {{fact.key}}，和正文同一条规矩
+  （注：这里是 .format() 模板，示例里的花括号一律双写 —— JSON 部分同理）
+- 不要过渡句（「接下来我们看看……」），不要总结句（「总的来说……」）
+- 拿不准的分寸和不许说的话，和上面「硬规则」完全一致
 """

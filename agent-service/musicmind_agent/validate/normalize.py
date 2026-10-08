@@ -89,3 +89,24 @@ def name_variants(text: str) -> set[str]:
 def name_matches(needle: str, haystack: str) -> bool:
     """needle 的任一繁简变体出现在 haystack 的任一变体里。两边都要展开。"""
     return any(n in h for n in name_variants(needle) for h in name_variants(haystack))
+
+
+def name_key(text: str) -> str:
+    """名字的**唯一键**：去空格 + 小写 + 剥括号附注 + 繁转简。
+
+    和 name_variants 的区别：那个是「匹配用的变体集」（比 contains），
+    这个是「判等用的规范形」（比 ==）。用于「同名同人」判定 ——
+    推荐要排除用户已有的歌时，同一个键命中就说明是同一首歌
+    （库里同一首歌常有多条 MBID 条目，track_id 排不干净）。
+
+    【剥括号和 KeywordVariants / 对齐 SQL 是同一套规则】库里同名歌常带
+    版本附注（「守候 (2020重唱版)」），不剥的话「守候」和它算出两个键，
+    推荐照样推重（2026-10-07 实测）。代价是真·不同版本（Live）也会被
+    当成同一首挡掉 —— 宁可少推一首，不可推一首用户已经有的。
+    """
+    s = str(text or "").replace(" ", "").lower()
+    for ch in ("(", "（"):
+        i = s.find(ch)
+        if i > 0:
+            s = s[:i]
+    return convert(s, "zh-cn")

@@ -330,27 +330,57 @@ def _map_candidates(data: dict, candidates: list[dict]) -> dict:
     """把模型给的候选序号映射回真实 track_id【并把名字带上】。
 
     **这是「模型空间」和「数据空间」的边界**：模型只看得见序号，
-    落库的报告里必须是真实 id。越界的序号直接丢掉，不要猜 ——
+    落库的报告里必须是真实 id。两个线索都指不到的行直接丢掉，不要猜 ——
     猜错了推荐的就是另一首歌，而且没人会发现。
+
+    【按名字反查优先，序号兜底】实测模型会系统性数错序号（报告 30：
+    20 条里前 8 条的理由整体错开一行，它按 0-based 数了；同样 prompt 的
+    报告 28 又全对）。所以推荐结构里让模型**同时原样抄歌名**：
+    先按歌名在候选里找回真正那一行 —— 「抄一行里的歌名」比「数第几行」
+    可靠得多（2026-10-07 修）。名字为空或匹配不上，才回到序号。
+    两者都指不到 → 丢掉。
+    名字归一用 name_variants（繁简/空格/大小写）——这个仓库比名字一律用它。
 
     【为什么要把名字也塞进报告】第一版只映射了 track_id，
     结果前端拿到一条只有 id 的推荐，页面上显示的是「#16033」——
     用户根本不知道推的是哪首歌，整个推荐列表就废了。
     序号对应的那一行本来就有歌名/艺人/专辑，顺手带上，前端不用再查一次。
     """
+    from musicmind_agent.validate.normalize import name_variants
+
+    # 歌名归一 → 行。同名多版本（live/录音室）撞名时取先出现的 ——
+    # 总比错位好，而且这种撞名模型抄过来的名字本来也区分不了
+    by_name: dict[str, dict] = {}
+    for row in candidates:
+        for variant in name_variants(str(row.get("歌名") or "")):
+            by_name.setdefault(variant, row)
+
     kept = []
     for rec in data.get("recommendations") or []:
-        idx = rec.get("candidate_index")
-        if not isinstance(idx, int) or not (1 <= idx <= len(candidates)):
+        row = None
+        picked = str(rec.get("name") or "").strip()
+        if picked:
+            for variant in name_variants(picked):
+                if variant in by_name:
+                    row = by_name[variant]
+                    break
+        if row is None:
+            idx = rec.get("candidate_index")
+            if isinstance(idx, int) and 1 <= idx <= len(candidates):
+                row = candidates[idx - 1]
+        if row is None:
             continue
-        row = candidates[idx - 1]
         kept.append({
             **rec,
+            # 这行覆盖模型抄的名字 —— 落库的是候选表里的规范写法
             "track_id": row["track_id"],
             "name": row.get("歌名"),
             "artist_names": row.get("艺人"),
             "album_name": row.get("专辑"),
             "release_year": row.get("发行年"),
+            # 给推荐列表的 ▶ 和播放条封面（M8 后加，来自 similar_tracks 的 rows）
+            "has_preview": bool(row.get("hasPreview")),
+            "album_id": row.get("albumId"),
             "rank": rec.get("rank") or len(kept) + 1,
         })
     return {**data, "recommendations": kept}
@@ -366,6 +396,9 @@ def _render(draft: dict, facts: dict, candidates=None) -> dict:
         data = _map_candidates(data, candidates.rows)
     data["headline"]["title"] = render_text(data["headline"]["title"], facts, strict=False)
     data["headline"]["subtitle"] = render_text(data["headline"]["subtitle"], facts, strict=False)
+    # 【新字段都要在这收口】漏一个就会出现「没替换的花括号」——
+    # limitations 当年就是这么漏的
+    data["opening"] = render_text(data.get("opening") or "", facts, strict=False)
     for dim in data["dimensions"]:
         dim["summary"] = render_text(dim["summary"], facts, strict=False)
         for claim in dim["claims"]:

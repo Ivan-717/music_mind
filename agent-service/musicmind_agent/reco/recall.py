@@ -155,7 +155,8 @@ def mmr(items: list[Recalled], k: int, penalty_same_album: float = 0.15,
 def recommend(tracks, all_tracks, k: int = 20,
               explore_quota: float = EXPLORE_QUOTA,
               known_artist_ids: set[int] | None = None,
-              known_track_ids: set[int] | None = None) -> list[Recalled]:
+              known_track_ids: set[int] | None = None,
+              known_name_keys: set[tuple[str, str]] | None = None) -> list[Recalled]:
     """推荐的确定性版本（不经过 LLM）。评估里的 content 基线就是它。
 
     known_artist_ids / known_track_ids 是「用户整体已经有什么」。
@@ -183,6 +184,18 @@ def recommend(tracks, all_tracks, k: int = 20,
     **0.5 是两边都站得住的默认值**，而且它天然是个该交给用户的旋钮 ——
     「想多听点熟悉的」还是「想找点没听过的」是个人偏好，不该写死在代码里。
     """
+    # 【同曲不同版本也要排除】库里同一首歌有多条 MBID 条目（「绅士」14265/14268），
+    # known_track_ids 只排掉用户对齐上的那一条，另一条照样进候选 ——
+    # 用户看到「我歌单里有这首」又被推一次（2026-10-07 实测被当场指出）。
+    # 键 = 归一化(歌名 + 主艺人)：只按歌名会误杀同名不同曲
+    # （队长的《哪里都是你》不该挡掉周杰伦的同名歌）。
+    if known_name_keys:
+        from musicmind_agent.validate.normalize import name_key
+        all_tracks = [
+            t for t in all_tracks
+            if (name_key(t.track_name), name_key(t.artist_name)) not in known_name_keys
+        ]
+
     profile = build_profile(tracks, known_artist_ids, known_track_ids)
     merged = recall(tracks, all_tracks, profile)
     ranked = mmr(list(merged.values()), len(merged))

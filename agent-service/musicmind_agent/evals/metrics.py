@@ -53,3 +53,33 @@ def kl_divergence(p: Counter, q: Counter) -> float:
             (p.get(g, 0) / p_total + eps) / (q.get(g, 0) / q_total + eps))
         for g in vocab
     )
+
+
+def lift_over_random(recall: float, recall_random: float, ceiling: float) -> float:
+    """相对随机的提升：0 = 和瞎猜一样，1 = 吃满上界。
+
+    【为什么必须有它】random 推 k 首，光靠「藏歌占全库的比例」就能白拿命中 ——
+    2026-10-08 实测 artist_cold k=50：random 3.3% > content 1.2%，
+    绝对值在这个口径下已经没有分辨力了。上界已经被随机吃满时（denom <= 0）
+    返回 0 —— 无从提升不是「无限好」。
+    """
+    denom = ceiling - recall_random
+    if denom <= 0:
+        return 0.0
+    return (recall - recall_random) / denom
+
+
+def novelty_at_k(recommended: list[int], known: set[int], k: int) -> float:
+    """推的 k 首里「不在用户已知集合」的比例。
+
+    【为什么和 recall 一起报】recall 高而 novelty 低 = 在复制用户已有的歌 ——
+    旧口径 83% 那种数字就是泄露红利的形状。产品目标是推没听过的。
+    注意 known 是【用户全部曲目】（含藏起来的那部分）——藏歌虽然不在画像里，
+    但对用户来说仍然是「已经有的」。
+
+    没传 k 截断的推荐（少于 k 条）时按实际条数算 —— 返回空集记 0。
+    """
+    top = recommended[:k]
+    if not top:
+        return 0.0
+    return len([i for i in top if i not in known]) / len(top)

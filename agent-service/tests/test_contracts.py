@@ -85,16 +85,20 @@ def test_every_tool_has_a_description():
         assert tool.tier in (0, 1, 2), f"{name} 的 tier 不合法：{tool.tier}"
 
 
-def test_core_tools_are_exactly_six():
+def test_core_tools_are_exactly_seven():
     """核心工具的数量是个设计决定，不是巧合。
 
     它们每次报告都无条件跑，是「两次运行可比」的基础。
     增减这个集合等于改变报告的结构，应该是刻意的行为。
+
+    7 个的由来：原 6 个 + region_distribution（M8 加，音乐人格「型」需要地区维度）。
+    这次增加是刻意的 —— 以后再加，请同样在这行注释里写清「为什么」。
     """
     from musicmind_agent.tools import REGISTRY
     core = [n for n, t in REGISTRY.items() if t.tier == 0]
-    assert len(core) == 6, f"核心工具应是 6 个，实际 {len(core)}：{core}"
+    assert len(core) == 7, f"核心工具应是 7 个，实际 {len(core)}：{core}"
     assert "mood_energy_profile" in core, "情绪/能量是核心维度，不能被降级成探针"
+    assert "region_distribution" in core, "M8 的型匹配要 region fact，不能被降级成探针"
 
 
 def test_tier1_catalog_excludes_core_tools():

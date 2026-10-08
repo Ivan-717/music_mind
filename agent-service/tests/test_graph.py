@@ -263,6 +263,40 @@ def test_map_candidates_all_invalid_yields_empty():
     assert _map_candidates(draft, [{"track_id": 1}, {"track_id": 2}])["recommendations"] == []
 
 
+def test_map_candidates_name_wins_over_wrong_index():
+    """实测的错位（报告 30）：序号数错一行、名字抄对了 —— 必须按名字找回来。
+
+    模型「数第几行」不可靠（0-based、错一行都发生过），
+    但「抄一行里的歌名」可靠得多。名字优先、序号兜底：都指不到才丢。
+    """
+    from musicmind_agent.graph.nodes import _map_candidates
+
+    rows = [{"track_id": 100, "歌名": "甲", "艺人": "A"},
+            {"track_id": 200, "歌名": "乙", "艺人": "B"},
+            {"track_id": 300, "歌名": "丙", "艺人": "C"}]
+
+    # 想推「丙」（第 3 行），但序号按 0-based 写成 2 —— 名字抄对了
+    out = _map_candidates(
+        {"recommendations": [{"candidate_index": 2, "name": "丙", "reason": "x"}]}, rows)
+    assert out["recommendations"][0]["track_id"] == 300      # 信名字，不信序号
+    assert out["recommendations"][0]["name"] == "丙"          # 落库的是规范写法
+
+    # 简繁/空格归一：抄成「 丙 」也认
+    out = _map_candidates(
+        {"recommendations": [{"candidate_index": 1, "name": " 丙 ", "reason": "x"}]}, rows)
+    assert out["recommendations"][0]["track_id"] == 300
+
+    # 名字匹配不上、序号有效 → 回到序号（名字可能只是抄错了，序号还算数）
+    out = _map_candidates(
+        {"recommendations": [{"candidate_index": 2, "name": "查无此歌", "reason": "x"}]}, rows)
+    assert out["recommendations"][0]["track_id"] == 200
+
+    # 名字乱写 + 序号越界 → 丢，不猜
+    out = _map_candidates(
+        {"recommendations": [{"candidate_index": 99, "name": "查无此歌", "reason": "x"}]}, rows)
+    assert out["recommendations"] == []
+
+
 # ---------- 起点必须清干净上一次的残留 ----------
 
 def _ctx_with(n_tracks: int):

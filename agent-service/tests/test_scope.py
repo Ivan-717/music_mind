@@ -112,3 +112,39 @@ def test_explore_quota_splits_by_the_wide_known_set():
 
     artists = {item.track.artist_id for item in picked}
     assert 9 in artists, f"陌生歌手那一半名额没留出来：{artists}"
+
+
+def test_recommend_excludes_same_name_same_artist():
+    """同曲不同版本也要排除（2026-10-07 实测被用户当场指出）。
+
+    库里同一首歌有多条 MBID 条目（薛之谦《绅士》= 14265 / 14268）：
+    known_track_ids 只排掉用户对齐上的那一条，另一条照样进候选 ——
+    用户看到「我歌单里有这首」又被推一次。
+    排除键是 (归一名, 归一主艺人)：**同名不同人不误伤** ——
+    队长的《哪里都是你》不该挡掉周杰伦的同名歌。
+    """
+    from musicmind_agent.validate.normalize import name_key
+
+    me = track(1, track_name="绅士", artist_name="薛之谦")
+    other_copy = track(2, track_name="绅士", artist_name="薛之谦")   # 同曲的另一个条目
+    name_twin = track(3, track_name="绅士", artist_name="别的人")    # 同名不同人
+    fresh = track(4, track_name="全新的歌", artist_name="新的人")
+
+    known_keys = {(name_key("绅士"), name_key("薛之谦"))}
+    picked = recommend([me], [me, other_copy, name_twin, fresh], k=2,
+                       explore_quota=0.0, known_track_ids={1},
+                       known_name_keys=known_keys)
+    ids = {item.track.track_id for item in picked}
+    assert 2 not in ids, "同曲的另一个条目不该被推荐"
+    assert 3 in ids, "同名不同人不该被误伤"
+    assert 4 in ids
+
+    # 繁简/空格归一后也算同一首：库里条目写繁体、歌单写简体同样要排掉
+    tc = track(5, track_name="紳士", artist_name="薛之謙")
+    picked2 = recommend([me], [me, tc, fresh], k=2, explore_quota=0.0,
+                        known_track_ids={1}, known_name_keys=known_keys)
+    assert 5 not in {i.track.track_id for i in picked2}, "繁简差异漏排了"
+
+    # 括号附注也算同一首（实测：「守候」和库里的「守候 (2020重唱版)」）
+    assert name_key("守候 (2020重唱版)") == name_key("守候")
+    assert name_key("守候（2020重唱版）") == name_key("守候")

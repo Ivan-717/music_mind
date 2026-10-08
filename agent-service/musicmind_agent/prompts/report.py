@@ -125,9 +125,13 @@ def build_messages(ctx, candidates, tool_results=None, reco_count: int = 5) -> l
         # prompt 里同时出现两列 track id（evidence 里用户听过的 + 候选里没听过的），
         # 模型会混 —— 实测每次跑都因此触发一轮 repair，约 10-13 秒。
         # 只发序号之后，候选的 id 根本不进 prompt，混都混不了。
+        # 【白名单，不是黑名单】原来是「排除 track_id、其余全给」——
+        # 候选行以后每加一个内部字段（hasPreview / albumId）都会自动漏进 prompt，
+        # 而规则是「凡是要模型引用的实体只给一种标识符」（见 models.Recommendation）。
+        # 只放该看的，其余默认进不来
+        keep = ("歌名", "艺人", "专辑", "发行年", "流派", "能量")
         numbered = [
-            {"candidate_index": i + 1,
-             **{k: v for k, v in row.items() if k != "track_id"}}
+            {"candidate_index": i + 1, **{k: v for k, v in row.items() if k in keep}}
             for i, row in enumerate(candidates.rows)
         ]
         blocks += (

@@ -83,6 +83,9 @@ class ToolContext:
     #   · 探索配额要按「真的没听过的歌手」算（否则陈奕迅在分析小歌单时算陌生）
     all_known_track_ids: set[int] = field(default_factory=set)
     all_known_artist_ids: set[int] = field(default_factory=set)
+    # (归一歌名, 归一主艺人) —— 同一首歌的多个 MBID 条目靠它排干净，
+    # 见 evidence.resolve_all_known 的说明
+    all_known_name_keys: set[tuple[str, str]] = field(default_factory=set)
 
     def fact(self, key: str, value: float | int | str) -> None:
         """登记一条事实。key 必须是 dotted 形式，且不能被重复写。
