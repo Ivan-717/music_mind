@@ -55,14 +55,15 @@ CREATE TABLE IF NOT EXISTS `play_history` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'MusicMind 内部主键',
   `user_id` bigint unsigned NOT NULL COMMENT '用户',
   `track_id` bigint unsigned NOT NULL COMMENT '歌曲',
-  `played_ms` bigint unsigned NOT NULL DEFAULT '0' COMMENT '实际播放毫秒数',
+  `source` varchar(16) NOT NULL DEFAULT 'other' COMMENT '来源页：report/album/playlist/search/favorite/artist/chat/other（只有 report 是「推荐被采纳」的信号）',
+  `played_ms` bigint unsigned NOT NULL DEFAULT '0' COMMENT '实际播放毫秒数（第一版恒 0：开始播时上报，拿不到最终时长）',
   `played_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '播放时刻',
   PRIMARY KEY (`id`),
   KEY `idx_play_history_user_time` (`user_id`,`played_at`),
   KEY `idx_play_history_track_id` (`track_id`),
   CONSTRAINT `fk_play_history_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_play_history_track` FOREIGN KEY (`track_id`) REFERENCES `track` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='播放记录（append-only，不更新）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='播放/试听记录（append-only，不更新。2026-10-08 起由试听上报写入 —— 推荐质量的在线信号）';
 
 CREATE TABLE IF NOT EXISTS `playlist` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'MusicMind 内部主键',

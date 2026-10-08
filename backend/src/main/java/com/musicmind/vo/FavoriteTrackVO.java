@@ -13,4 +13,6 @@ public class FavoriteTrackVO {
     private String albumName;   // ← album_name
     private String artistNames; // ← artist_names
     private LocalDateTime favoritedAt;  // ← favorited_at
+    /** 有没有 30 秒试听。前端据此决定给不给 ▶（没试听的不给按钮） */
+    private Boolean hasPreview;
 }

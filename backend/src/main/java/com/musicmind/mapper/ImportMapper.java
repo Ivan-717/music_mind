@@ -58,7 +58,11 @@ public interface ImportMapper {
                     WHERE rt2.track_id = t.id
                     ORDER BY mr2.release_date IS NULL, mr2.release_date, mr2.id
                     LIMIT 1)
-            WHERE REPLACE(t.name, ' ', '') IN (REPLACE(#{t1}, ' ', ''), REPLACE(#{t2}, ' ', ''), REPLACE(#{t3}, ' ', ''))
+            WHERE (REPLACE(t.name, ' ', '') IN (REPLACE(#{t1}, ' ', ''), REPLACE(#{t2}, ' ', ''), REPLACE(#{t3}, ' ', ''))
+                -- 库名常带英文副题（「流行歌曲 (Popular Songs)」），剥掉括号后缀再比一次。
+                -- 和 KeywordVariants.of 的剥括号变体【对称】—— 两边都做，只做一边没用
+                OR REPLACE(SUBSTRING_INDEX(SUBSTRING_INDEX(t.name, '(', 1), '（', 1), ' ', '')
+                   IN (REPLACE(#{t1}, ' ', ''), REPLACE(#{t2}, ' ', ''), REPLACE(#{t3}, ' ', '')))
               AND EXISTS (
                     SELECT 1 FROM track_artist ta
                     JOIN artist ar ON ar.id = ta.artist_id

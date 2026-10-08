@@ -54,7 +54,11 @@ public interface FavoriteTrackMapper {
                        CONCAT(COALESCE(ta.credited_name, ar.name),
                               COALESCE(ta.join_phrase, ''))
                        ORDER BY ta.id SEPARATOR ''
-                   ) AS artist_names
+                   ) AS artist_names,
+                   EXISTS(SELECT 1 FROM track_audio_feature f
+                          WHERE f.track_id = t.id
+                            AND f.preview_url IS NOT NULL
+                            AND f.preview_url <> '') AS has_preview
             FROM favorite_track ft
             JOIN track t              ON t.id = ft.track_id
             LEFT JOIN album a         ON a.id = (

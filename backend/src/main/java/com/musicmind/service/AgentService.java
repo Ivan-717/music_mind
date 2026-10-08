@@ -1,5 +1,6 @@
 package com.musicmind.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.musicmind.config.AgentProperties;
 import com.musicmind.entity.AgentConversation;
 import com.musicmind.entity.AgentRun;
@@ -334,4 +335,41 @@ public class AgentService {
 
     /** 一次报告的估算耗时。实测 p50 28.7s / p95 33.2s，取 40 秒给用户一个数量级 */
     private static final int ESTIMATE_SECONDS = 40;
+
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * 认领一个型。规则：
+     *   1. 报告必须属于本人（findOwned 的 WHERE 里带 user_id，不存在/越权都是 404）
+     *   2. name 必须在报告的候选列表里 —— 不校验的话前端能塞任意字符串
+     */
+    public Map<String, Object> claimType(Long userId, Long reportId, String name) {
+        Map<String, Object> report = reportMapper.findOwned(reportId, userId);
+        if (report == null) {
+            throw new ApiException(404, "报告不存在");
+        }
+        if (name == null || name.isBlank()) {
+            throw new ApiException(400, "型名不能为空");
+        }
+        boolean ok = false;
+        try {
+            JsonNode candidates = objectMapper.readTree(
+                            String.valueOf(report.get("report_json")))
+                    .path("persona_type_candidates");
+            for (JsonNode c : candidates) {
+                if (name.equals(c.path("name").asText())) {
+                    ok = true;
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            throw new ApiException(500, "报告内容无法解析");
+        }
+        if (!ok) {
+            throw new ApiException(400, "这个型不在候选列表里");
+        }
+        reportMapper.updateType(reportId, userId, name);
+        return Map.of("personaType", name);
+    }
 }

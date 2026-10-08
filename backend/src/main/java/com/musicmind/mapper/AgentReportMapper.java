@@ -3,6 +3,7 @@ package com.musicmind.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 import java.util.Map;
@@ -19,8 +20,8 @@ public interface AgentReportMapper {
 
     @Select("""
             SELECT id, user_id, status, scope_kind, scope_ref, scope_label,
-                   headline, data_scope_json,
-                   report_json, llm_provider, llm_model, tokens_in, tokens_out,
+                   headline, persona_type, report_json, data_scope_json,
+                   llm_provider, llm_model, tokens_in, tokens_out,
                    latency_ms, created_at
             FROM agent_report
             WHERE id = #{id} AND user_id = #{userId}
@@ -42,4 +43,12 @@ public interface AgentReportMapper {
             LIMIT 50
             """)
     List<Map<String, Object>> listByUser(@Param("userId") Long userId);
+
+    /** 认领型。**WHERE 里带 user_id** —— 不带的话 B 能改 A 的报告（和 findOwned 同一个道理） */
+    @Update("""
+            UPDATE agent_report SET persona_type = #{name}
+            WHERE id = #{id} AND user_id = #{userId}
+            """)
+    int updateType(@Param("id") Long id, @Param("userId") Long userId,
+                   @Param("name") String name);
 }

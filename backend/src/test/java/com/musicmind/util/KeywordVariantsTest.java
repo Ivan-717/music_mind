@@ -23,4 +23,19 @@ class KeywordVariantsTest {
         System.out.println("### 周杰伦 -> " + v);
         assertTrue(v.contains("周杰倫"), v.toString());
     }
+
+    @Test
+    void stripsParenthesizedSuffix() {
+        // 库里的「流行歌曲 (Popular Songs)」要靠这个变体才能和歌单的「流行歌曲」
+        // 等值比上（2026-10-07：一直 UNRESOLVED，推荐还把它推回给用户）
+        List<String> v = KeywordVariants.of("晴天 (Live)");
+        System.out.println("### 晴天 (Live) -> " + v);
+        assertTrue(v.contains("晴天"), "剥掉括号后缀的形式必须在：" + v);
+
+        List<String> v2 = KeywordVariants.of("晴天（Live）");
+        assertTrue(v2.contains("晴天"), "全角括号也要剥：" + v2);
+
+        // 本来就是干净的词，不受影响
+        assertTrue(KeywordVariants.of("流行歌曲").contains("流行歌曲"));
+    }
 }

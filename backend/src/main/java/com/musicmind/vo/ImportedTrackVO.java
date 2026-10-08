@@ -19,4 +19,6 @@ public class ImportedTrackVO {
     private Long matchedTrackId;
     /** 当前用户收藏了没有。没对齐的歌恒为 false */
     private Boolean favorited;
+    /** 有没有 30 秒试听。未对齐（matchedTrackId 为 null）的行恒为 false */
+    private Boolean hasPreview;
 }

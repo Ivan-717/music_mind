@@ -10,4 +10,6 @@ public class AlbumTrackVO {
     private Integer discNumber;
     private Integer trackNumber;
     private String artistNames;
+    /** 有没有 30 秒试听（track_audio_feature.preview_url）。前端据此决定给不给 ▶ */
+    private Boolean hasPreview;
 }

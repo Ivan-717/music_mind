@@ -43,6 +43,15 @@ public final class KeywordVariants {
             '杰', '傑'
     );
 
+    /** 第一个 '(' 或 '（' 的位置；没有返回 -1。见 of() 里的剥括号变体 */
+    private static int cutAt(String s) {
+        int half = s.indexOf('(');
+        int full = s.indexOf('（');
+        if (half < 0) return full;
+        if (full < 0) return half;
+        return Math.min(half, full);
+    }
+
     /** 把 TRADITIONAL_GAPS 里的字逐个替换。只走简→繁一个方向就够了：
      *  两边都在结果集里，匹配时是 contains 不是 equals */
     private static String fillGaps(String s) {
@@ -78,6 +87,27 @@ public final class KeywordVariants {
         // 放在去重之后、去空格之前 —— 补出来的字也要一起去空格
         for (String variant : new ArrayList<>(set)) {
             set.add(fillGaps(variant));
+        }
+
+        // 再补一轮：剥掉「(…)」「（…）」及其后面的内容。
+        //
+        // 库里的曲名常带英文副题：「流行歌曲 (Popular Songs)」—— 它是同一首歌的
+        // 完整名，不是另一个版本；而歌单里往往只写「流行歌曲」。不剥的话两边
+        // 等值比较永远配不上（2026-10-07 实测：这首歌明明在库里却一直 UNRESOLVED，
+        // 推荐还以为用户没听过、把它推了回去）。
+        //
+        // 【和 SQL 侧对称】matchTrack 里对 t.name 做了同样的嵌套 SUBSTRING_INDEX ——
+        // 只做一边没用，库里那边还带着括号。
+        // 范围只做圆括号（半角+全角）：歌名副题绝大多数是这个，【】「」先不收，
+        // 加规则要有实测案例，别照着命名规律扩。
+        for (String variant : new ArrayList<>(set)) {
+            int cut = cutAt(variant);
+            if (cut > 0) {
+                String stripped = variant.substring(0, cut).trim();
+                if (!stripped.isEmpty()) {
+                    set.add(stripped);
+                }
+            }
         }
 
         // 再去掉空格。

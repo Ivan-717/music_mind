@@ -177,7 +177,11 @@ public interface UserPlaylistMapper {
             <script>
             SELECT u.id, u.external_id, u.position, u.title, u.artists, u.album_name,
                    u.duration_ms, u.cover_url, u.match_status, u.matched_track_id,
-                   (ft.id IS NOT NULL) AS favorited
+                   (ft.id IS NOT NULL) AS favorited,
+                   EXISTS(SELECT 1 FROM track_audio_feature f
+                          WHERE f.track_id = u.matched_track_id
+                            AND f.preview_url IS NOT NULL
+                            AND f.preview_url &lt;&gt; '') AS has_preview
             FROM user_playlist_track u
             LEFT JOIN favorite_track ft
                    ON ft.user_id = u.user_id AND ft.track_id = u.matched_track_id

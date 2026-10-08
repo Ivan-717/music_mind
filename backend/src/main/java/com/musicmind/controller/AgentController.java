@@ -123,4 +123,11 @@ public class AgentController {
     public Map<String, Object> resume() {
         return agentService.resume();
     }
+
+    /** 认领型。body: {"name": "守夜人"} */
+    @PostMapping("/reports/{id}/type")
+    public Map<String, Object> claimType(@PathVariable Long id,
+                                         @RequestBody Map<String, String> body) {
+        return agentService.claimType(CurrentUser.id(), id, body.get("name"));
+    }
 }
