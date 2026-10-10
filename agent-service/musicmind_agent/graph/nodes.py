@@ -22,7 +22,7 @@ from musicmind_agent.llm import LLMClient
 from musicmind_agent.models import ReportDraft
 from musicmind_agent.prompts import compose as compose_prompt
 from musicmind_agent.prompts import probe as probe_prompt
-from musicmind_agent.render import render_text
+from musicmind_agent.render import render_display
 from musicmind_agent.tools import call, catalog, core_tool_names
 from musicmind_agent.tools.base import ToolContext
 from musicmind_agent.validate import validate
@@ -394,20 +394,22 @@ def _render(draft: dict, facts: dict, candidates=None) -> dict:
     data = copy.deepcopy(draft)
     if candidates is not None:
         data = _map_candidates(data, candidates.rows)
-    data["headline"]["title"] = render_text(data["headline"]["title"], facts, strict=False)
-    data["headline"]["subtitle"] = render_text(data["headline"]["subtitle"], facts, strict=False)
+    data["headline"]["title"] = render_display(data["headline"]["title"], facts)
+    data["headline"]["subtitle"] = render_display(data["headline"]["subtitle"], facts)
     # 【新字段都要在这收口】漏一个就会出现「没替换的花括号」——
-    # limitations 当年就是这么漏的
-    data["opening"] = render_text(data.get("opening") or "", facts, strict=False)
+    # limitations 当年就是这么漏的。
+    # 【渲染出口统一在 render.render_display】它同时做替换和展示层转简 ——
+    # 和 prompts/report.py 的姊妹 _render 用同一个出口，两处字段集合必须一致
+    data["opening"] = render_display(data.get("opening") or "", facts)
     for dim in data["dimensions"]:
-        dim["summary"] = render_text(dim["summary"], facts, strict=False)
+        dim["summary"] = render_display(dim["summary"], facts)
         for claim in dim["claims"]:
-            claim["text"] = render_text(claim["text"], facts, strict=False)
+            claim["text"] = render_display(claim["text"], facts)
     for rec in data["recommendations"]:
-        rec["reason"] = render_text(rec["reason"], facts, strict=False)
-        rec["relation_to_history"]["note"] = render_text(
-            rec["relation_to_history"]["note"], facts, strict=False)
-    data["limitations"] = [render_text(x, facts, strict=False) for x in data["limitations"]]
+        rec["reason"] = render_display(rec["reason"], facts)
+        rec["relation_to_history"]["note"] = render_display(
+            rec["relation_to_history"]["note"], facts)
+    data["limitations"] = [render_display(x, facts) for x in data["limitations"]]
 
     # 【依据行由代码渲染，不是 LLM 写的】名字是创作（模型负责），
     # 「这个名字打哪儿来」是事实（代码负责）。两个来源分开，

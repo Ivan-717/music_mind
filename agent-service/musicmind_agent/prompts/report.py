@@ -13,7 +13,7 @@ from musicmind_agent.llm import LLMClient, LLMResponse
 from musicmind_agent.models import ReportDraft
 from musicmind_agent.persona import render_traits, traits_from_facts
 from musicmind_agent.prompts.compose import PROMPT_VERSION, SYSTEM, USER_TEMPLATE
-from musicmind_agent.render import render_text
+from musicmind_agent.render import render_display
 from musicmind_agent.tools import build_context, call, catalog, core_tool_names
 
 
@@ -78,6 +78,31 @@ def format_context(ctx, results) -> str:
     return _format_tool_results(ctx, results)
 
 
+def _recent_titles_note(ctx) -> str:
+    """这个用户最近三份报告的标题 —— 给模型这次避开用。
+
+    【为什么查库而不是让模型记】每次生成是独立会话，模型不知道上次叫过什么；
+    实测标题跨用户跨时间高度撞车（「深夜」21/41），光换示例治不彻底。
+    查不到/查询失败就当没有历史 —— 这不是关键路径，不能拖垮生成。
+    """
+    connection = getattr(ctx, "connection", None)
+    user_id = getattr(getattr(ctx, "evidence", None), "user_id", None)
+    if connection is None or user_id is None:
+        return "（没有历史）"
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT headline FROM agent_report WHERE user_id = %s "
+                "AND headline IS NOT NULL ORDER BY id DESC LIMIT 3",
+                (user_id,))
+            titles = [r["headline"] for r in cursor.fetchall() if r["headline"]]
+    except Exception:
+        return "（没有历史）"
+    if not titles:
+        return "（这是 TA 的第一次画像，本次没有要避开的名字）"
+    return "、".join(f"《{t}》" for t in titles)
+
+
 def build_messages(ctx, candidates, tool_results=None, reco_count: int = 5) -> list[dict]:
     """compose / repair 共用的消息构造。
 
@@ -110,6 +135,10 @@ def build_messages(ctx, candidates, tool_results=None, reco_count: int = 5) -> l
         "mood": "mood_energy", "diversity": "diversity",
         "form": "album_form", "collab": "collaboration",
         "region": "region", "duration": "duration",
+        # 未入库那半边（artist_affinity 产出的 unmatched.*）。facts 里没有
+        # 这个前缀时它不会进 available_dims —— 让没数据的用户也写它，
+        # 正是这套「只列能写的」机制要防的事
+        "unmatched": "unmatched",
     }
     present = {k.split(".")[0] for k in results and ctx.facts}
     available_dims = sorted({PREFIX_TO_DIMENSION[p] for p in present if p in PREFIX_TO_DIMENSION})
@@ -151,6 +180,7 @@ def build_messages(ctx, candidates, tool_results=None, reco_count: int = 5) -> l
             tool_results=blocks or "（本轮没有额外的工具输出，用上面的概览）",
             unavailable=unavailable,
             reco_count=reco_count,
+            recent_titles=_recent_titles_note(ctx),
         )},
     ]
 
@@ -183,6 +213,7 @@ def build_report(connection, user_id: int, provider: str, client: LLMClient | No
                           + json.dumps(candidates.rows, ensure_ascii=False),
             unavailable="",
             reco_count=5,
+            recent_titles=_recent_titles_note(ctx),
         )},
     ]
 
@@ -205,22 +236,24 @@ def build_report(connection, user_id: int, provider: str, client: LLMClient | No
 
 
 def _render(draft: ReportDraft, facts: dict) -> dict:
-    """把所有 {fact.key} 换成真值。strict=False —— Phase 2 先看有多少没替换上，
-    Phase 3 的验证器会把它变成硬失败。"""
+    """把所有 {fact.key} 换成真值 + 展示层转简（render_display）。
+
+    **每个 LLM 写的字段都要过一遍** —— opening 漏过一次（v1.2 加字段时没跟上），
+    limitations 漏过一次，转简只在 graph 之外生效过一次。
+    graph/nodes.py 有一份姊妹实现，两处的字段集合必须一致；
+    渲染出口（转简等展示层处理）统一在 render.render_display，两边都调它。
+    """
     data = draft.model_dump()
-    data["headline"]["title"] = render_text(data["headline"]["title"], facts, strict=False)
-    data["headline"]["subtitle"] = render_text(data["headline"]["subtitle"], facts, strict=False)
+    data["headline"]["title"] = render_display(data["headline"]["title"], facts)
+    data["headline"]["subtitle"] = render_display(data["headline"]["subtitle"], facts)
+    data["opening"] = render_display(data["opening"] or "", facts)
     for dim in data["dimensions"]:
-        dim["summary"] = render_text(dim["summary"], facts, strict=False)
+        dim["summary"] = render_display(dim["summary"], facts)
         for claim in dim["claims"]:
-            claim["text"] = render_text(claim["text"], facts, strict=False)
+            claim["text"] = render_display(claim["text"], facts)
     for rec in data["recommendations"]:
-        rec["reason"] = render_text(rec["reason"], facts, strict=False)
-        rec["relation_to_history"]["note"] = render_text(
-            rec["relation_to_history"]["note"], facts, strict=False)
-    # limitations 也要渲染 —— 第一版漏了，于是「专辑级只覆盖 {coverage.genre_via_album} 首」
-    # 这种句子带着花括号原样输出。凡是 LLM 写的文本都要过一遍渲染，没有例外
-    data["limitations"] = [
-        render_text(item, facts, strict=False) for item in data["limitations"]
-    ]
+        rec["reason"] = render_display(rec["reason"], facts)
+        rec["relation_to_history"]["note"] = render_display(
+            rec["relation_to_history"]["note"], facts)
+    data["limitations"] = [render_display(item, facts) for item in data["limitations"]]
     return data

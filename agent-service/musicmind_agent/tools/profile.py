@@ -10,9 +10,11 @@ Agent 的自由度保留在 Tier 1 探针（额外查什么）和叙事上。
 
 from __future__ import annotations
 
+import json
 import math
 from collections import Counter
 
+from musicmind_agent.config import PROJECT_ROOT
 from musicmind_agent.evidence import MIN_ARTISTS, MIN_TRACKS
 from musicmind_agent.tools.base import (
     ToolContext,
@@ -21,6 +23,7 @@ from musicmind_agent.tools.base import (
     cov,
     register,
 )
+from musicmind_agent.validate.normalize import name_key
 
 # 推断值的置信度权重。低置信度的流派（mandopop 这种）几乎不参与 ——
 # 用它们推情绪等于没推，给个小权重比假装有用诚实
@@ -273,6 +276,14 @@ def era_distribution(ctx: ToolContext, args: dict) -> ToolResult:
         facts["era.year_min"] = min(years)
         facts["era.year_max"] = max(years)
 
+    # 未入库那半边的年代（发行年是导入时从网易云补抓的——MB 上没有这些歌）。
+    # 两个中位数差得远本身就是洞察：你听的老歌都入库了，新歌反而在对不上的那半
+    un_years = [r["release_year"] for r in _unmatched_context(ctx)
+                if r.get("release_year")]
+    if un_years:
+        facts["unmatched.era.median_year"] = int(_median(un_years) or 0)
+        facts["unmatched.era.tracks_with_year"] = len(un_years)
+
     return ToolResult(
         tool="era_distribution",
         facts=facts,
@@ -297,6 +308,52 @@ def era_distribution(ctx: ToolContext, args: dict) -> ToolResult:
 # ============================================================
 # 艺人
 # ============================================================
+
+def load_unmatched(connection, user_id: int) -> list[dict]:
+    """未入库的曲目（title / artists / release_year）—— 画像的「另一半」输入。
+
+    【为什么单独一个函数】artist_affinity（文本艺人 + 标签）和 era_distribution
+    （发行年）都要它 —— 两处各写一遍 SQL 迟早漂移。
+    release_year 是导入时从网易云补抓的（未入库的歌没有 MB 数据，这是唯一的年代来源）。
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT title, artists, release_year FROM user_playlist_track
+               WHERE user_id = %s AND user_removed = 0 AND match_status <> 'MATCHED'""",
+            (user_id,),
+        )
+        return cursor.fetchall()
+
+
+def _unmatched_context(ctx: ToolContext) -> list[dict]:
+    """带守卫的取数（测试的 fake ctx 没有 connection / user_id 时返回空）。"""
+    user_id = getattr(ctx.evidence, "user_id", None)
+    if user_id is None or ctx.connection is None:
+        return []
+    return load_unmatched(ctx.connection, user_id)
+
+
+# 层 2 缓存：fetch_artist_wikidata.py 产出的未入库艺人流派/地区。
+# 【为什么带 mtime 校验】抓取脚本会在会话中途重跑（补艺人、修错补）——
+# 模块级缓存不校验的话，进程不重启就一直吃旧数据，而且是静默吃旧数据。
+_WD_PATH = PROJECT_ROOT / "agent-service" / ".data" / "wikidata_artists.json"
+_WD_CACHE: dict = {"mtime": -1.0, "data": {}}
+
+
+def _wikidata_index() -> dict:
+    """读缓存；文件不存在（没跑过抓取）就当这层没有，画像退回层 1 的口径。"""
+    try:
+        mtime = _WD_PATH.stat().st_mtime
+    except OSError:
+        return {}
+    if mtime != _WD_CACHE["mtime"]:
+        try:
+            _WD_CACHE["data"] = json.loads(_WD_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        _WD_CACHE["mtime"] = mtime
+    return _WD_CACHE["data"]
+
 
 @register(
     "artist_affinity", 0,
@@ -330,6 +387,84 @@ def artist_affinity(ctx: ToolContext, args: dict) -> ToolResult:
     if top:
         facts["artist.top1_share"] = round(top[0][1] / total, 4) if total else 0
         facts["artist.top5_share"] = round(sum(c for _, c in counts.most_common(5)) / total, 4) if total else 0
+
+    # ---- 未入库的那半边（歌单里有、MusicBrainz 对不上的）----
+    # 【为什么并进这个工具】它算的就是「艺人」。未入库的歌没有流派/年代/能量，
+    # 能贡献的是**文本艺人名**（+ 导入时补抓的发行年和歌单标签）——
+    # 中文说唱/冷门歌的对齐率极低，不关心这半边的话画像就是「半个人的画像」。
+    # 【为什么单独一组 fact（unmatched.*）不混进 artist.*】混进去会让上面所有
+    # 覆盖率数字（分母、top1_share…）静默变化 —— 旧报告的对比全部失效。
+    # 口径：全量未入库（不随分析范围变），报告文案说「歌单里」即为此意。
+    unmatched_rows = _unmatched_context(ctx)
+    if unmatched_rows:
+        un_counter: Counter = Counter()
+        for r in unmatched_rows:
+            # 平台存的艺人格式是「主艺人 / 合作者」——取主艺人，和画像口径一致
+            primary = (r["artists"] or "").split(" / ")[0].strip()
+            if primary:
+                un_counter[primary] += 1
+        facts["unmatched.tracks"] = len(unmatched_rows)
+        facts["unmatched.artists"] = len(un_counter)
+        for name, count in un_counter.most_common(5):
+            key = "".join(ch if ch.isalnum() else "_" for ch in name)[:24]
+            facts[f"unmatched.artist.{key}.tracks"] = count
+            facts[f"unmatched.artist.{key}.share"] = round(
+                count / len(unmatched_rows), 4)
+
+        # ---- 未入库的流派/地区（层 2：Wikidata 缓存）----
+        # 【为什么按曲目加权，不按艺人数】一位 25 首的头部艺人和只有 1 首的
+        # 长尾同权的话，流派含量会被摊薄 —— 画像要回答的是「这些歌里什么最多」。
+        # 【为什么单独存 coverage】464 位里只有约 1/4 查得到条目 —— 展示层
+        # 必须能说「有据可查的那部分」，不标覆盖率就是静默夸大。
+        wd = _wikidata_index()
+        genre_tracks: Counter = Counter()
+        country_tracks: Counter = Counter()
+        genre_cover = country_cover = 0
+        for name, count in un_counter.items():
+            v = wd.get(name_key(name)) or {}
+            if v.get("v") != 2 or v.get("miss"):
+                continue
+            if v.get("genres"):
+                genre_cover += count
+                for g in set(v["genres"]):
+                    genre_tracks[g] += count
+            if v.get("country"):
+                country_cover += count
+                for c in set(v["country"]):
+                    country_tracks[c] += count
+        if genre_cover:
+            facts["unmatched.genre.tracks"] = genre_cover
+            facts["unmatched.genre.coverage"] = round(
+                genre_cover / len(unmatched_rows), 4)
+            for g_name, n in genre_tracks.most_common(8):
+                facts[f"unmatched.genre.{_fact_key(g_name)}.tracks"] = n
+                facts[f"unmatched.genre.{_fact_key(g_name)}.share"] = round(
+                    n / genre_cover, 4)
+        if country_cover:
+            facts["unmatched.country.tracks"] = country_cover
+            for c_name, n in country_tracks.most_common(6):
+                facts[f"unmatched.country.{_fact_key(c_name)}.tracks"] = n
+                facts[f"unmatched.country.{_fact_key(c_name)}.share"] = round(
+                    n / country_cover, 4)
+
+    # 歌单标签（用户建的歌单才有；榜单类没有）。口味的粗粒度信号
+    user_id = getattr(ctx.evidence, "user_id", None)
+    if user_id is not None and ctx.connection is not None:
+        with ctx.connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT tags FROM user_playlist_import
+                   WHERE user_id = %s AND tags IS NOT NULL AND tags <> ''""",
+                (user_id,),
+            )
+            tag_rows = cursor.fetchall()
+        tag_counter: Counter = Counter()
+        for r in tag_rows:
+            for t in (r["tags"] or "").split(","):
+                t = t.strip()
+                if t:
+                    tag_counter[t] += 1
+        for tag, n in tag_counter.most_common(6):
+            facts[f"unmatched.tag.{_fact_key(tag)}.playlists"] = n
 
     return ToolResult(
         tool="artist_affinity",
@@ -479,6 +614,18 @@ def mood_energy_profile(ctx: ToolContext, args: dict) -> ToolResult:
         facts["mood.valence_is_measured"] = 0
     strong = sum(1 for *_, c in inferred_tracks if c in ("high", "medium"))
     facts["mood.inferred_high_confidence_tracks"] = strong
+
+    # 调性（大小调）——**这个是真实测的**，和效价（纯流派推断）不是一回事。
+    # 置信度门槛 0.5：librosa 对无调性/打击乐为主的曲目会给低置信的猜测，
+    # 全算进来等于往「情绪明暗」里掺随机数（全库平均置信度 0.60）。
+    # 这是画像里「情绪明暗」第一次有实测信号 —— 之前只有推断的 valence
+    modal = [t for t in tracks
+             if t.mode_major is not None and (t.mode_confidence or 0) >= 0.5]
+    if modal:
+        minors = sum(1 for t in modal if t.mode_major == 0)
+        facts["mood.mode_measured_tracks"] = len(modal)
+        facts["mood.minor_share"] = round(minors / len(modal), 4)
+        facts["mood.major_share"] = round(1 - minors / len(modal), 4)
 
     bands = Counter()
     for a in all_arousal:

@@ -85,6 +85,28 @@ def _display_name(fact_key: str) -> str:
     return parts[-2].replace("_", " ") if len(parts) >= 3 else fact_key
 
 
+def _genre_display(name: str) -> str:
+    """展示层的流派/地区名：繁转简。
+
+    【只转字，不合并条目】「華語流行音樂」和「中文流行音乐」在 Wikidata 是
+    两个条目，合不合并是语义判断，展示层不替数据做这个决定 ——
+    和繁简政策同一条规矩：存原样（profile 的 facts）、转换只在渲染。
+    """
+    from zhconv import convert
+
+    return convert(name, "zh-cn")
+
+
+def _top_shares(facts: dict[str, Any], prefix: str, k: int) -> str:
+    """某前缀下 share 最高的 k 条，渲染成「名字（N%）」串。"""
+    pool = {key: val for key, val in facts.items()
+            if key.startswith(prefix) and key.endswith(".share")
+            and isinstance(val, (int, float))}
+    top = sorted(pool.items(), key=lambda kv: -kv[1])[:k]
+    return "、".join(f"{_genre_display(_display_name(key))}（{val:.0%}）"
+                     for key, val in top)
+
+
 def _row_names(tool_results: dict | None, tool: str, field: str) -> dict[str, str]:
     """从某个工具的输出里捞「曲目数 → 真名」的映射，用来修正 _display_name 的有损还原。
 
@@ -117,8 +139,13 @@ def _name_for(fact_key: str, facts: dict[str, Any], names: dict[str, str]) -> st
 
 def traits_from_facts(facts: dict[str, Any],
                       tool_results: dict | None = None,
-                      limit: int = 6) -> list[Trait]:
+                      limit: int = 7) -> list[Trait]:
     """挑素材。按辨识度排序，最多 limit 条；facts 里没有的直接跳过。
+
+    【limit 为什么是 7 不是 6】「未入库那半边」这一段排在 7 条候选的第 7 位
+    （能量/头部流派/头部艺人/年代/口味宽度/探索度/未入库）—— limit=6 时
+    它被截掉，而它讲的是真实用户 64% 的曲目（实测 user 34：791/1234），
+    是画像里最大的一块结构信息。加到 7 让它出得来，不改任何既有排序。
 
     **不编任何一条。** 某个维度没数据（比如没有实测音频特征）就不出这条素材，
     而不是给个默认值 —— 素材少几条，名字顶多朴素一点；编一条出去，
@@ -186,6 +213,51 @@ def traits_from_facts(facts: dict[str, Any],
         traits.append(Trait(
             key="diversity.singleton_artist_share", name="探索度",
             reading=f"只出现过一次的艺人占 {_share_reading(float(singleton))}",
+        ))
+
+    # ---- 未入库的那半边 ----
+    # 中文说唱/冷门歌有近一半对齐不上 MB，但那半边的人是真实听着的。
+    # 素材里明说，名字/开场白才可能把「半个人的画像」补回来。
+    un_tracks = facts.get("unmatched.tracks")
+    if isinstance(un_tracks, (int, float)) and un_tracks:
+        who = ""
+        top_un = _top_by_share(facts, "unmatched.artist.")
+        if top_un:
+            key, _ = top_un
+            who = f"，最常见的还是 {_display_name(key)}"
+        reading = f"歌单里另有 {int(un_tracks)} 首没入库（MusicBrainz 上大多没有）{who}"
+        # 层 2（Wikidata 补的流派/地区）**并进这条，不单开素材** ——
+        # 素材默认只取 6 条，单开一条会排在第 7-8 位被截掉、根本出不来；
+        # 未入库流派的覆盖率只有 ~1/4，文案必须带「有据可查的 N 首」，
+        # 不写限定词读的人会以为这半边全都识别了，那是静默夸大。
+        un_gen = facts.get("unmatched.genre.tracks")
+        if isinstance(un_gen, (int, float)) and un_gen:
+            reading += (f"。有据可查的 {int(un_gen)} 首以"
+                        f"{_top_shares(facts, 'unmatched.genre.', 3)}为主")
+            if facts.get("unmatched.country.tracks"):
+                reading += f"（艺人多来自 {_top_shares(facts, 'unmatched.country.', 2)}）"
+        traits.append(Trait(
+            key="unmatched.tracks", name="未入库",
+            reading=reading,
+        ))
+
+    # 未入库那半边的年代（发行年是导入时补抓的）——和库内的中位数对比着看
+    un_year = facts.get("unmatched.era.median_year")
+    if isinstance(un_year, (int, float)) and un_year:
+        traits.append(Trait(
+            key="unmatched.era.median_year", name="未入库年代",
+            reading=f"没入库的那半边，发行年中位数 {int(un_year)}",
+        ))
+
+    # 歌单标签（用户建的歌单才有；榜单类没有）。粗粒度但真实
+    tag_facts = {k: v for k, v in facts.items()
+                 if k.startswith("unmatched.tag.") and k.endswith(".playlists")}
+    if tag_facts:
+        top_tags = sorted(tag_facts.items(), key=lambda kv: -kv[1])[:3]
+        names = "、".join(_display_name(k) for k, _ in top_tags)
+        traits.append(Trait(
+            key=top_tags[0][0], name="歌单标签",
+            reading=f"你建的歌单带着这些标签：{names}",
         ))
 
     return traits[:limit]

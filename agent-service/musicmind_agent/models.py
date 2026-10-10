@@ -28,6 +28,8 @@ class Dimension(BaseModel):
     dimension: Literal[
         "genre", "era", "artist", "mood_energy",
         "album_form", "duration", "diversity", "collaboration", "region",
+        # 没入库的那半边（unmatched.* facts）。只有当 facts 里真有才允许写
+        "unmatched",
     ]
     summary: str
     claims: list[Claim] = Field(default_factory=list)

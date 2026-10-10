@@ -90,6 +90,24 @@ def render_text(text: str, facts: dict[str, Any], strict: bool = True) -> str:
     return rendered
 
 
+def render_display(text: str, facts: dict[str, Any]) -> str:
+    """渲染 + 展示层转简 —— 报告文本的**唯一出口**，两处 _render 都走它。
+
+    【为什么放公共模块】prompts/report.py 和 graph/nodes.py 各有一份 _render：
+    转简只加在了一份上，另一份就漂了（2026-10-10 实测：生产路径正文还带
+    「周杰倫」）；opening 漏渲染也只在其中一份上发生。出口收成同一个，
+    加新的渲染处理就只改这里。
+
+    转简的政策依据：库里的实体名存繁体原样（「周杰倫」），LLM 会照抄；
+    「存繁体原样、转换放展示层」——报告就是展示层。
+    zhconv 只动汉字，数字和已替换的真值不受影响；验证器对照用的
+    name_variants 本来就是双向繁简，转简不破坏校验。
+    """
+    from zhconv import convert
+
+    return convert(render_text(text, facts, strict=False), "zh-cn")
+
+
 def find_bare_numbers(text: str) -> list[str]:
     """找出文本里没走占位符的裸数字。
 

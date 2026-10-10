@@ -127,3 +127,62 @@ def test_brace_wrapped_number_fix_does_not_hide_fake_keys():
     """兜底不能掩盖真问题：编造的事实名里有点号和字母，不该被当成数字放过。"""
     out = render_text("占 {form.album.share}", FACTS, strict=False)
     assert "{form.album.share}" in out
+
+
+# ---------------------------------------------------------------
+# _render 的字段覆盖（渲染层的静默洞）
+# ---------------------------------------------------------------
+
+DRAFT_MIN = {
+    "headline": {"title": "{scope.tracks}", "subtitle": "{scope.tracks}", "used_facts": []},
+    "opening": "{scope.tracks}",
+    "dimensions": [{
+        "dimension": "genre", "summary": "{scope.tracks}", "confidence": "high",
+        "claims": [{"text": "{scope.tracks}", "basis": "data"}],
+    }],
+    "recommendations": [{
+        "candidate_index": 1, "name": "歌名", "reason": "{scope.tracks}",
+        "relation_to_history": {"anchors": [], "note": "{scope.tracks}"}, "rank": 1,
+    }],
+    "limitations": ["{scope.tracks}"],
+}
+
+
+def test_render_covers_every_llm_text_field():
+    """【回归】report.py 的 _render 必须覆盖 walk_texts 列出的每一个 LLM 文本字段。
+
+    这类洞栽过两次：先 limitations、后 opening（v1.2 加字段时渲染没跟上，
+    models.py 当时的注释写着「渲染/校验收口见 P5/P6」，然后就忘了 ——
+    2026-10-10 开场白里一个占位符原样漏出来才暴露）。
+    """
+    from musicmind_agent.models import ReportDraft
+    from musicmind_agent.prompts.report import _render
+    from musicmind_agent.validate.checks import walk_texts
+
+    rendered = _render(ReportDraft.model_validate(DRAFT_MIN), {"scope.tracks": 448})
+
+    leftovers = [path for path, text in walk_texts(rendered) if "{" in text]
+    assert not leftovers, f"这些字段没被渲染：{leftovers}"
+
+
+def test_graph_render_covers_every_field_and_converts_traditional():
+    """【回归】graph/nodes.py 的姊妹 _render 同样要覆盖全部字段 + 转简。
+
+    两处 _render 是两份实现，坑的位置每次不同：opening 漏在 report.py 那份，
+    转简漏在 nodes 这份（2026-10-10 实测：生产路径正文还带「周杰倫」）。
+    渲染出口已统一到 render.render_display —— 这个测试钉住两边都得走它。
+    """
+    from musicmind_agent.graph.nodes import _render
+    from musicmind_agent.validate.checks import walk_texts
+
+    draft = {k: v for k, v in DRAFT_MIN.items()}
+    # 标题里带一个「LLM 会从库里照抄的繁体名」——转简断言才有对象可测
+    draft["headline"] = {"title": "常听周杰倫，占了 {artist.周杰倫.share}",
+                         "subtitle": "{scope.tracks}", "used_facts": []}
+    rendered = _render(draft, {"scope.tracks": 448, "artist.周杰倫.share": 0.12})
+
+    leftovers = [path for path, text in walk_texts(rendered) if "{" in text]
+    assert not leftovers, f"这些字段没被渲染：{leftovers}"
+    # 转简也在生产路径的字段上生效
+    assert "周杰倫" not in rendered["headline"]["title"]
+    assert "周杰伦" in rendered["headline"]["title"]

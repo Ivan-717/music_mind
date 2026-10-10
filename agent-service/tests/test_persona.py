@@ -165,3 +165,39 @@ def test_arousal_band_is_anchored_not_invented():
     assert "偏热烈" in band(0.60)
     assert "很热烈" in band(0.90)
     assert "0.5 是区间中点" in band(0.60)
+
+
+def test_unmatched_genre_merge_into_unmatched_trait():
+    """层 2 素材必须带「有据可查的 N 首」，且**默认 limit 下就出得来**。
+
+    未入库里只有约 1/4 的艺人查得到条目 —— 不写这个限定词，读的人会以为
+    791 首全识别了，那是静默夸大覆盖率。曾经单开过一条素材，排到第 7 位
+    被 limit=6 截掉、生产路径里根本出不来（测试逼出来的）—— 现在信息
+    并进「未入库」这条，且 limit 提到 7。流派名展示层繁转简（存原样、
+    转换只在渲染，和库里繁体政策同一条规矩）。
+    """
+    facts = full_facts(**{
+        "unmatched.tracks": 791,
+        "unmatched.genre.tracks": 143,
+        "unmatched.genre.coverage": 0.1808,
+        "unmatched.genre.華語流行音樂.share": 0.3287,
+        "unmatched.genre.嘻哈音樂.share": 0.2517,
+        "unmatched.country.tracks": 217,
+        "unmatched.country.中华人民共和国.share": 0.539,
+    })
+
+    trait = next(t for t in traits_from_facts(facts, ROWS)
+                 if t.key == "unmatched.tracks")      # 默认 limit
+
+    assert "有据可查的 143 首" in trait.reading
+    assert "华语流行音乐" in trait.reading          # 繁体 → 展示层转简
+    assert "華語流行音樂" not in trait.reading
+    assert "中华人民共和国" in trait.reading
+
+
+def test_unmatched_genre_absent_without_coverage():
+    """没有层 2 的 facts（没跑过抓取）→ 文案不出流派那半句 —— 不是给个空句子。"""
+    facts = full_facts(**{"unmatched.tracks": 791})
+    trait = next(t for t in traits_from_facts(facts, ROWS)
+                 if t.key == "unmatched.tracks")
+    assert "有据可查" not in trait.reading

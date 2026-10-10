@@ -68,6 +68,8 @@ class EnrichedTrack:
     arousal_measured: float | None
     artist_verified: bool
     has_preview: bool = False     # 有没有 30 秒试听（track_audio_feature.preview_url）
+    mode_major: int | None = None         # 调性：1 大调 / 0 小调（音频实测，librosa）
+    mode_confidence: float | None = None  # 调性置信度。低置信的不要当结论用
 
     @property
     def year(self) -> int | None:
@@ -130,7 +132,8 @@ _ENRICH_SQL = f"""
            (SELECT GROUP_CONCAT(g.name)
               FROM artist_genre ag JOIN genre g ON g.id = ag.genre_id
              WHERE ag.artist_id = ar.id) AS artist_genres,
-           af.arousal_measured, af.artist_verified, af.preview_url
+           af.arousal_measured, af.artist_verified, af.preview_url,
+           af.mode_major, af.mode_confidence
     FROM track t
     {_PRIMARY_ARTIST}
     {_ALBUM_PICK}
@@ -318,6 +321,12 @@ def _to_tracks(rows) -> list[EnrichedTrack]:
             ),
             artist_verified=bool(row["artist_verified"]),
             has_preview=bool(row["preview_url"]),
+            mode_major=(
+                int(row["mode_major"]) if row["mode_major"] is not None else None
+            ),
+            mode_confidence=(
+                float(row["mode_confidence"]) if row["mode_confidence"] is not None else None
+            ),
         )
         for row in rows
     ]

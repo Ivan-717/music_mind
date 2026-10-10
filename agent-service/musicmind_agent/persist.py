@@ -101,13 +101,18 @@ def run_and_persist(connection, run_id: int) -> int:
     rendered["persona_type_candidates"] = score_types(facts)
 
     with connection.cursor() as cursor:
+        # prompt 版本落库 —— 41 份历史报告这一列全是 NULL，导致「报告质量变了」
+        # 分不清是模型换了还是 prompt 改了（评估时想按版本对比才发现的）。
+        # 取当前代码的常量：持久化这一刻的版本就是生成时的版本
+        from musicmind_agent.prompts.compose import PROMPT_VERSION
+
         cursor.execute(
             """
             INSERT INTO agent_report
                 (user_id, status, scope_kind, scope_ref, scope_label,
                  report_json, facts_json, data_scope_json, headline,
-                 llm_provider, llm_model, tokens_in, tokens_out, latency_ms)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 llm_provider, llm_model, prompt_version, tokens_in, tokens_out, latency_ms)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (run["user_id"], status, scope_kind, scope_ref,
              # 【label 在这里定，不是入队时定】入队到出报告之间歌单可能已被改名。
@@ -117,7 +122,7 @@ def run_and_persist(connection, run_id: int) -> int:
              json.dumps(facts, ensure_ascii=False, default=str),
              json.dumps(data_scope, ensure_ascii=False, default=str),
              (rendered.get("headline") or {}).get("title"),
-             usage.get("provider"), usage.get("model"),
+             usage.get("provider"), usage.get("model"), PROMPT_VERSION,
              usage.get("tokens_in"), usage.get("tokens_out"),
              int((time.monotonic() - started) * 1000)))
         report_id = cursor.lastrowid

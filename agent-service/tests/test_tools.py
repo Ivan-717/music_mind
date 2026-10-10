@@ -105,3 +105,77 @@ def test_search_tracks_warns_about_the_coverage_cost(monkeypatch):
     result = call("search_tracks", _ctx([track(1)]), {"arousal_max": 0.4})
 
     assert any("实测特征" in w for w in result.warnings), result.warnings
+
+
+# ---------------------------------------------------------------
+# artist_affinity 的未入库半边（层 2：Wikidata 缓存）
+# ---------------------------------------------------------------
+
+def test_artist_affinity_registered_tool_actually_runs():
+    """【回归】走 REGISTRY 的 artist_affinity 必须是能跑的工具函数本身。
+
+    实测事故：层 1 把 load_unmatched 插在 @register 和 artist_affinity 之间，
+    装饰器贴到了 load_unmatched 上 —— 生产路径走 call() 调它，参数对不上
+    （connection 收到 ToolContext）直接抛 AttributeError，被 call() 吞成
+    warning，「头部艺人」和整段未入库素材静默消失。直调函数测不出来
+    （那正是当时测试全绿的原因），只有走 call() 才复现。
+    """
+    result = call("artist_affinity", _ctx([track(1)]))
+
+    assert not any("执行失败" in w for w in result.warnings), result.warnings
+    assert "artist.distinct" in result.facts
+
+def test_unmatched_genre_aggregates_by_tracks(tmp_path, monkeypatch):
+    """未入库流派按**曲目加权**聚合，且覆盖率和聚合数一起出。
+
+    按艺人数加权的话，25 首的头部艺人和 1 首的长尾同权 —— 画像要回答的
+    是「这些歌里什么最多」，所以口径必须是曲目数。覆盖率（coverage）也
+    必须如实带出：464 位里只有约 1/4 查得到条目，展示层靠它说「有据可查」。
+    """
+    import json
+
+    from musicmind_agent.tools import profile
+
+    wd = {
+        "c-block": {"v": 2, "genres": ["嘻哈音樂"], "country": ["中华人民共和国"]},
+        "马思唯": {"v": 2, "genres": ["嘻哈音樂"], "country": []},
+        "无名氏": {"v": 2, "miss": True},
+    }
+    p = tmp_path / "wikidata_artists.json"
+    p.write_text(json.dumps(wd, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(profile, "_WD_PATH", p)
+    monkeypatch.setattr(profile, "_WD_CACHE", {"mtime": -1.0, "data": {}})
+    monkeypatch.setattr(profile, "_unmatched_context", lambda ctx: [
+        {"title": "a", "artists": "C-BLOCK", "release_year": 2020},
+        {"title": "b", "artists": "C-BLOCK / 某人", "release_year": 2021},
+        {"title": "c", "artists": "马思唯", "release_year": 2022},
+        {"title": "d", "artists": "无名氏", "release_year": 2023},
+    ])
+
+    facts = profile.artist_affinity(_ctx([track(1)]), {}).facts
+
+    assert facts["unmatched.tracks"] == 4
+    assert facts["unmatched.genre.tracks"] == 3          # 3/4 首查得到流派
+    assert facts["unmatched.genre.coverage"] == 0.75
+    assert facts["unmatched.genre.嘻哈音樂.tracks"] == 3  # 2 + 1，按曲目加权
+    assert facts["unmatched.genre.嘻哈音樂.share"] == 1.0
+    assert facts["unmatched.country.中华人民共和国.tracks"] == 2
+
+
+def test_unmatched_genre_absent_without_cache(tmp_path, monkeypatch):
+    """没跑过抓取（缓存文件不存在）→ 一个 unmatched.genre.* 都不出。
+
+    出默认值等于编数据；层 2 缺席时画像退回层 1 的口径，静默降级但不出假话。
+    """
+    from musicmind_agent.tools import profile
+
+    monkeypatch.setattr(profile, "_WD_PATH", tmp_path / "nope.json")
+    monkeypatch.setattr(profile, "_WD_CACHE", {"mtime": -1.0, "data": {}})
+    monkeypatch.setattr(profile, "_unmatched_context", lambda ctx: [
+        {"title": "a", "artists": "C-BLOCK", "release_year": 2020},
+    ])
+
+    facts = profile.artist_affinity(_ctx([track(1)]), {}).facts
+
+    assert facts["unmatched.tracks"] == 1
+    assert not any(k.startswith("unmatched.genre.") for k in facts)

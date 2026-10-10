@@ -333,6 +333,16 @@ def check_entities(report, ctx, result: ValidationResult, candidate_ids=None) ->
         parts = key.split(".")
         if len(parts) >= 3 and parts[0] == "genre":
             known.append(parts[-2].replace("_", " "))
+        # 未入库的文本艺人名也要认 —— 报告会提「歌单里还常听 X，没入库」
+        if len(parts) >= 3 and parts[0] == "unmatched" and parts[1] == "artist":
+            known.append(parts[-2].replace("_", " "))
+        # 未入库的流派/地区（层 2）报告也会提（「未入库以华语流行音乐为主」）——
+        # 这些名字只在 wikidata 缓存里、不在任何 track 上，不索引就是一片误报。
+        # len==4 是 `<前缀>.<类型>.<名字>.tracks` 的形状；
+        # `unmatched.genre.tracks`（覆盖数，len==3）不是名字，跳过。
+        if (len(parts) == 4 and parts[0] == "unmatched"
+                and parts[1] in ("genre", "country")):
+            known.append(parts[-2].replace("_", " "))
 
     # 【推荐曲目也要进索引】报告解释推荐理由时会提被推荐的那首歌和它的专辑
     # （「这首来自《黑色的梦》」），那不是用户听过的，但确实是数据里真实存在的。
@@ -387,6 +397,21 @@ def check_evidence(report, ctx, result: ValidationResult, candidate_ids=None) ->
                     f"证据曲目 {tid} 不是用户的歌"
                     + ("（它可能是推荐候选 —— 候选不是用户听过的）"
                        if candidate_ids and tid in candidate_ids else "")))
+
+    # --- unmatched 维度不该挂证据 ---
+    # 【为什么】未入库曲目没有 track_id，模型想挂证据时会硬凑几首入库曲目 ——
+    # 数字没出错（refs 全真），但证据链指错地方。实测 2026-10-10：claim 讲的是
+    # 未入库的歌，ev 挂的是入库说唱歌的 id。宁可空着。
+    for i, dim in enumerate(report.get("dimensions") or []):
+        if dim.get("dimension") != "unmatched":
+            continue
+        for j, claim in enumerate(dim.get("claims") or []):
+            result.checked += 1
+            if claim.get("evidence_track_ids"):
+                result.violations.append(Violation_(
+                    "evidence", f"dimensions[{i}].claims[{j}]",
+                    "unmatched 维度不该挂 evidence_track_ids —— "
+                    "未入库曲目没有 track_id，凑出来的 id 是错配"))
 
     # --- 推荐项 ---
     rec_ids = [r.get("track_id") for r in report.get("recommendations") or []]
