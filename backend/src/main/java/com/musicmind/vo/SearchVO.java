@@ -21,4 +21,10 @@ public class SearchVO {
     private List<TrackSearchVO> tracks = List.of();
     private List<AlbumSearchVO> albums = List.of();
     private List<ArtistSearchVO> artists = List.of();
+
+    /**
+     * 「你歌单里还没入库的」命中 —— 搜索的第二来源（2026-10-09）。
+     * 库里搜不到的中文歌，往往就在这儿：「消失」变成「看得见、有状态、能试听」。
+     */
+    private List<MyPlaylistHitVO> playlistHits = List.of();
 }

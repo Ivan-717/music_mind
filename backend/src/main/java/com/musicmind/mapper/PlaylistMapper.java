@@ -59,7 +59,13 @@ public interface PlaylistMapper {
                    GROUP_CONCAT(
                        CONCAT(COALESCE(ta.credited_name, ar.name), COALESCE(ta.join_phrase, ''))
                        ORDER BY ta.id SEPARATOR ''
-                   ) AS artist_names
+                   ) AS artist_names,
+                   -- 【引用 pt.track_id 不是 t.id】这个查询的 GROUP BY 里没有 t.id
+                   -- （只有 pt.track_id，两者 JOIN 等值），引用 t.id 会撞 ONLY_FULL_GROUP_BY
+                   EXISTS(SELECT 1 FROM track_audio_feature f
+                          WHERE f.track_id = pt.track_id
+                            AND f.preview_url IS NOT NULL
+                            AND f.preview_url <> '') AS has_preview
             FROM playlist_track pt
             JOIN track t              ON t.id = pt.track_id
             LEFT JOIN album a         ON a.id = (

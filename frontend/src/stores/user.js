@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiLogin } from '@/api/auth'
+import { apiLogin, apiMe } from '@/api/auth'
 
 const TOKEN_KEY = 'mm_token'
 
@@ -27,5 +27,21 @@ export const useUserStore = defineStore('user', () => {
     user.value = data.user
   }
 
-  return { token, user, login, setToken, clear }
+  /**
+   * 刷新后把用户信息找回来（导航栏的用户名）。
+   *
+   * 【失败不清 token】一次网络抖动不该把人踢下线 ——
+   * 真正的 401 由 http.js 的拦截器统一处理（清 token + 跳登录）。
+   * 这里失败就当导航栏少个名字，不影响任何操作。
+   */
+  async function fetchMe() {
+    if (!token.value || user.value) return
+    try {
+      user.value = await apiMe()
+    } catch (e) {
+      /* 静默，见上 */
+    }
+  }
+
+  return { token, user, login, setToken, clear, fetchMe }
 })

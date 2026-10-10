@@ -3,6 +3,7 @@ package com.musicmind.mapper;
 import com.musicmind.entity.UserPlaylistImport;
 import com.musicmind.entity.UserPlaylistTrack;
 import com.musicmind.vo.ImportedTrackVO;
+import com.musicmind.vo.MyPlaylistHitVO;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
@@ -40,10 +41,10 @@ public interface UserPlaylistMapper {
 
     @Insert("""
             INSERT INTO user_playlist_import
-                (user_id, provider, external_playlist_id, playlist_name, source_url,
+                (user_id, provider, external_playlist_id, playlist_name, tags, source_url,
                  track_count, last_imported_at)
             VALUES
-                (#{userId}, #{provider}, #{externalPlaylistId}, #{playlistName}, #{sourceUrl},
+                (#{userId}, #{provider}, #{externalPlaylistId}, #{playlistName}, #{tags}, #{sourceUrl},
                  #{trackCount}, NOW())
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -51,7 +52,7 @@ public interface UserPlaylistMapper {
 
     @Update("""
             UPDATE user_playlist_import
-               SET playlist_name = #{playlistName}, source_url = #{sourceUrl},
+               SET playlist_name = #{playlistName}, tags = #{tags}, source_url = #{sourceUrl},
                    track_count = #{trackCount}, last_imported_at = NOW()
              WHERE id = #{id}
             """)
@@ -66,15 +67,16 @@ public interface UserPlaylistMapper {
     @Insert("""
             INSERT INTO user_playlist_track
                 (import_id, user_id, provider, external_id, position,
-                 title, artists, album_name, duration_ms, cover_url)
+                 title, artists, album_name, release_year, duration_ms, cover_url)
             VALUES
                 (#{importId}, #{userId}, #{provider}, #{externalId}, #{position},
-                 #{title}, #{artists}, #{albumName}, #{durationMs}, #{coverUrl})
+                 #{title}, #{artists}, #{albumName}, #{releaseYear}, #{durationMs}, #{coverUrl})
             ON DUPLICATE KEY UPDATE
                 position = VALUES(position),
                 title = VALUES(title),
                 artists = VALUES(artists),
                 album_name = VALUES(album_name),
+                release_year = COALESCE(VALUES(release_year), release_year),
                 duration_ms = VALUES(duration_ms),
                 cover_url = VALUES(cover_url)
             """)
@@ -196,6 +198,45 @@ public interface UserPlaylistMapper {
                                        @Param("offset") int offset,
                                        @Param("size") int size,
                                        @Param("filter") String filter);
+
+    /**
+     * 搜「我的歌单里还没入库的」曲目（搜索页的第二来源，2026-10-09）。
+     *
+     * 只查未对齐的行 —— 已对齐的已经在 track 搜索结果里，重复出现没有意义。
+     * 歌名和艺人两边都比（用户可能搜歌名也可能搜歌手），繁简变体由调用方展开。
+     * 【`&lt;&gt;` 是转义】script 里直接写 `<>` 会被当 XML 解析、启动就炸。
+     */
+    @Select("""
+            <script>
+            SELECT u.id          AS row_id,
+                   u.import_id,
+                   i.playlist_name,
+                   u.provider,
+                   u.external_id,
+                   u.title,
+                   u.artists,
+                   u.album_name,
+                   u.duration_ms,
+                   u.cover_url,
+                   u.match_status
+            FROM user_playlist_track u
+            JOIN user_playlist_import i ON i.id = u.import_id
+            WHERE u.user_id = #{userId} AND u.user_removed = 0
+              AND u.match_status &lt;&gt; 'MATCHED'
+              AND (REPLACE(u.title, ' ', '') LIKE CONCAT('%', #{v1}, '%')
+                OR REPLACE(u.title, ' ', '') LIKE CONCAT('%', #{v2}, '%')
+                OR REPLACE(u.title, ' ', '') LIKE CONCAT('%', #{v3}, '%')
+                OR REPLACE(u.artists, ' ', '') LIKE CONCAT('%', #{v1}, '%')
+                OR REPLACE(u.artists, ' ', '') LIKE CONCAT('%', #{v2}, '%')
+                OR REPLACE(u.artists, ' ', '') LIKE CONCAT('%', #{v3}, '%'))
+            ORDER BY u.id DESC
+            LIMIT 20
+            </script>
+            """)
+    List<MyPlaylistHitVO> searchUnmatched(@Param("userId") Long userId,
+                                          @Param("v1") String v1,
+                                          @Param("v2") String v2,
+                                          @Param("v3") String v3);
 
     /**
      * 总数。user_removed = 1 的是被用户剔除的，不能再算进总数，否则页码和列表对不上。

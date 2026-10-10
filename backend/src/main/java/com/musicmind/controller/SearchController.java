@@ -1,5 +1,6 @@
 package com.musicmind.controller;
 
+import com.musicmind.security.CurrentUser;
 import com.musicmind.service.SearchService;
 import com.musicmind.vo.SearchVO;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class SearchController {
     @GetMapping
     public SearchVO search(@RequestParam("q") String q,
                            @RequestParam(value = "limit", required = false) Integer limit) {
-        return searchService.search(q, limit);
+        // userId 用于第二来源：搜「我的歌单里还没入库的」（越权天然隔离——只搜自己的）
+        return searchService.search(q, limit, CurrentUser.id());
     }
 }

@@ -37,6 +37,14 @@ export const apiQueueAll = (importId) =>
  */
 export const apiIngestionStatus = () => http.get('/ingestion/status')
 
+/**
+ * 「补全这位歌手的专辑」（搜索页的入口，2026-10-09）。
+ * mbid 与 artistId 二选一：上游 lookup 的条目带 mbid，本地搜索的条目只有 id。
+ * 返回 {queued, skippedQueued, found, estimateSeconds, importId} ——
+ * **found/queued 可能是 0**（没有可补的、或都已在库里），前端要如实显示。
+ */
+export const apiQueueArtist = (payload) => http.post('/ingestion/artist', payload)
+
 /** 停止。当前这条跑完就停，队列保留 */
 export const apiStopIngestion = () => http.post('/ingestion/stop')
 

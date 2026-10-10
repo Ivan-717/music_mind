@@ -15,16 +15,25 @@ function mmss(s) {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
-// 平台封面（歌单页的 coverUrl 是外链）会防盗链/过期，挂了就退回占位
+// 平台封面（歌单页的 coverUrl 是外链）会防盗链/过期，挂了就退回占位。
+// 【watch 用 key 不用 trackId】未入库的歌没有 trackId —— 两首未入库歌之间
+// 切换时 trackId 都是 undefined，封面就不会重置
 const coverFailed = ref(false)
-watch(() => player.track?.trackId, () => { coverFailed.value = false })
+watch(() => player.track?.key, () => { coverFailed.value = false })
+
+/** 点顶部进度条快进/快退（外链给的是整曲，没 seek 很难受） */
+function seek(e) {
+  const rect = e.currentTarget.getBoundingClientRect()
+  player.seekTo((e.clientX - rect.left) / rect.width)
+}
 </script>
 
 <template>
   <Transition name="mp">
     <div v-if="player.track" class="mini-player">
-      <!-- 顶上一条琥珀进度线：正在发声的东西才亮 —— 全站的色彩语义到这才闭环 -->
-      <div class="mp-progress">
+      <!-- 顶上一条琥珀进度线：正在发声的东西才亮 —— 全站的色彩语义到这才闭环。
+           整条可以点：热区 10px（视觉线还是 2px），点哪跳哪 -->
+      <div class="mp-progress" @click="seek">
         <span :style="{ width: (player.progress * 100) + '%' }"></span>
       </div>
 

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { apiFavoritePage, apiUnfavorite } from '@/api/favorite'
+import { apiFavoritePage, apiUnfavorite, apiUnfavoriteBatch } from '@/api/favorite'
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
 import CoverImage from '@/components/CoverImage.vue'
@@ -59,9 +59,46 @@ async function remove(trackId) {
   }
 }
 
+// ---- 批量取消收藏（照「我的歌单」页的勾选模式；收藏页只有这一个动作）----
+const selected = ref(new Set())
+const working = ref(false)
+const notice = ref('')
+
+const selectedIds = computed(() => [...selected.value])
+const allSelected = computed(() =>
+  items.value.length > 0 && selected.value.size === items.value.length)
+
+function setSelected(next) { selected.value = next }
+function toggleOne(it) {
+  const next = new Set(selected.value)
+  next.has(it.trackId) ? next.delete(it.trackId) : next.add(it.trackId)
+  setSelected(next)
+}
+function toggleAll() {
+  setSelected(allSelected.value ? new Set() : new Set(items.value.map((it) => it.trackId)))
+}
+
+async function batchUnfavorite() {
+  if (!selected.value.size || working.value) return
+  working.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const r = await apiUnfavoriteBatch(selectedIds.value)
+    notice.value = `已取消收藏 ${r.changed} 首`
+    setSelected(new Set())
+    await load()          // load 里有「删空当页回退一页」的逻辑，直接复用
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    working.value = false
+  }
+}
+
 function go(p) {
   if (p < 1 || p > totalPages.value || p === page.value) return
   page.value = p
+  setSelected(new Set())      // 翻页清勾选（跨页勾选的语义先不做）
   load()
 }
 
@@ -82,9 +119,23 @@ onMounted(load)
   <p v-else-if="items.length === 0" class="empty">还没有收藏任何歌曲</p>
 
   <template v-else>
+    <p v-if="notice" class="notice">{{ notice }}</p>
+    <div class="select-bar">
+      <label class="pick-all">
+        <input type="checkbox" :checked="allSelected" @change="toggleAll" />
+        全选本页（{{ items.length }} 首）
+      </label>
+      <span v-if="selected.size" class="pick-count">已选 {{ selected.size }} 首</span>
+      <button class="sm" :disabled="working || !selected.size" @click="batchUnfavorite">
+        {{ working ? '处理中…' : '取消收藏' }}
+      </button>
+    </div>
+
     <ul class="fav-list">
       <li v-for="it in items" :key="it.trackId"
-          :class="{ playing: player.isCurrent(it.trackId) }">
+          :class="{ playing: player.isCurrent(it.trackId), picked: selected.has(it.trackId) }">
+        <input class="pick" type="checkbox"
+               :checked="selected.has(it.trackId)" @change="toggleOne(it)" />
         <CoverImage :album-id="it.albumId" :size="44" :alt="fmt(it.albumName)" />
         <div class="body">
           <div class="row">

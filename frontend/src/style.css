@@ -388,6 +388,10 @@ img { background: var(--bg-soft); }
 
 .fav-list li { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0;
                border-bottom: 1px solid var(--line-soft); }
+/* 批量勾选（和 .my-track-list 的 pick 同款） */
+.fav-list .pick { flex: none; margin-top: 14px; cursor: pointer;
+                  accent-color: var(--accent); }
+.fav-list li.picked { background: var(--bg-soft); }
 .fav-list .body { flex: 1; min-width: 0; }   /* min-width:0 防止长文本把 flex 撑爆 */
 
 .fav-list .row { display: flex; align-items: center; gap: 12px; }
@@ -432,7 +436,9 @@ img { background: var(--bg-soft); }
 .track-list .no { width: 26px; text-align: left; color: var(--mute);
                   font-family: var(--mono); font-size: 12px;
                   font-variant-numeric: tabular-nums; }
-.track-list .name { flex: 1; }
+/* min-width:0 防止长歌名（尤其长英文单词，不可断）把右边的列挤出屏幕 ——
+   .my-track-list .name 和 .fav-list .body 都有这条，就它漏了（桌面也是 bug） */
+.track-list .name { flex: 1; min-width: 0; }
 .track-list .artist { flex: none; width: 150px; color: var(--dim); font-size: 13px;
                        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 只有搜索结果有这个列（专辑详情页本来就在一张专辑里，没必要重复） */
@@ -948,20 +954,29 @@ img { background: var(--bg-soft); }
   font-size: 11px; padding: 1px 7px; border-radius: 999px;
   background: var(--sage-bg); color: var(--sage);
 }
-.path-list .grab {
+/* 「抓进库里」小按钮：探索路径、搜索页的歌手行（补全专辑）共用 */
+.path-list .grab, .artist-list .grab, .lookup-list .grab {
   font-size: 11.5px; padding: 2px 10px; cursor: pointer;
   border-radius: var(--radius-sm); border: 1px solid var(--line);
   background: var(--bg-soft); color: var(--accent);
 }
-.path-list .grab:hover:not(:disabled) { border-color: var(--accent); }
-.path-list .grab:disabled { color: var(--mute); cursor: default; }
+.path-list .grab:hover:not(:disabled),
+.artist-list .grab:hover:not(:disabled),
+.lookup-list .grab:hover:not(:disabled) { border-color: var(--accent); }
+.path-list .grab:disabled,
+.artist-list .grab:disabled,
+.lookup-list .grab:disabled { color: var(--mute); cursor: default; }
+/* 搜索页两处的按钮要跟右缘对齐（lookup 行的 state 列后面） */
+.artist-list li { align-items: center; }
+.artist-list .grab, .lookup-list .grab { margin-left: auto; flex: none; }
 /* 连到上一站的那句话，比 why_here 更弱一点 */
 .path-list .relation {
   margin: 6px 0 0; font-size: 12.5px; color: var(--plum); line-height: 1.65;
 }
 .path-list .why { margin: 3px 0 0; font-size: 13px; color: var(--dim); line-height: 1.7; }
 
-.save-row { margin: 12px 0 0; }
+.save-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin: 12px 0 0; }
 .save-row button {
   padding: 5px 16px; font-size: 12.5px; cursor: pointer;
   border-radius: var(--radius-sm); border: 1px solid var(--line);
@@ -969,6 +984,10 @@ img { background: var(--bg-soft); }
 }
 .save-row button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .save-row button:disabled { color: var(--mute); cursor: default; }
+/* 内联命名输入（替代 window.prompt —— 移动端 webview 会拦截 prompt） */
+.save-row .inline-name, .rename-input {
+  flex: 1; max-width: 320px; padding: 5px 10px; font-size: 13px;
+}
 
 /* 抓取提议。视觉上要像「一张清单 + 一个动作」，不是像回答的一部分 */
 .fetch-list {
@@ -992,6 +1011,12 @@ img { background: var(--bg-soft); }
   background: var(--bg); cursor: default; }
 
 .persona-ask { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+
+/* 本次生成的消耗：一行小字，跟在局限后面 */
+.gen-cost {
+  margin: 22px 0 0; font-family: var(--mono); font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
 .persona-ask h4 { margin: 0 0 6px; font-size: 15px; color: var(--text);
                   font-family: var(--display); font-weight: 500; }
 .msg-list { list-style: none; margin: 14px 0; padding: 0; }
@@ -1043,9 +1068,15 @@ img { background: var(--bg-soft); }
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--line);
 }
-.mp-progress { height: 2px; background: var(--line-soft); }
+/* 热区 10px（好点），视觉线还是 2px —— 点哪跳哪 */
+.mp-progress { position: relative; height: 10px; cursor: pointer; }
+.mp-progress::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: var(--line-soft); transition: background .15s;
+}
+.mp-progress:hover::before { background: var(--line); }
 .mp-progress span {
-  display: block; height: 100%; width: 0;
+  position: absolute; left: 0; top: 0; height: 2px; width: 0;
   background: var(--accent);
   box-shadow: 0 0 8px rgba(232, 169, 76, .5);
 }
@@ -1126,4 +1157,30 @@ main.has-player { padding-bottom: 152px; }
   /* 播放条：时间让位给歌名 */
   .mp-inner { padding: 8px 16px; gap: 10px; }
   .mp-time { display: none; }
+
+  /* ---- 列表页：折叠次要列 ----
+     390px 下这些固定宽列（artist 150 + album 190 + dur…）合计远超屏宽，
+     必然横向溢出。**折叠而不是横向滚动**：横滚会把 ▶/♡/✕ 等操作列藏到
+     屏外（等于按钮消失），还和浏览器边缘返回手势打架 ——
+     口径是「不溢出、能读、能点」（见上方块首注释），不是重新设计移动端 */
+  .track-list .no,
+  .track-list .artist,
+  .track-list .album { display: none; }
+  /* 歌单页保留 pick/cover/ingest/fav/drop —— 那是手机上的主操作 */
+  .my-track-list .no,
+  .my-track-list .artist,
+  .my-track-list .album,
+  .my-track-list .dur,
+  .my-track-list .state { display: none; }
+  /* 歌单页的标题和三个操作按钮一行摆不下 */
+  .playlist-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .playlist-actions { flex-wrap: wrap; }
+  /* 收藏页 meta 行允许换行，时间让位 */
+  .fav-list .meta { flex-wrap: wrap; }
+  .fav-list .time { display: none; }
+
+  /* 版本下拉：select 的最小宽度是「最长 option」（「……· TW · 2024-12-03 · 35曲」），
+     光靠 flex:1 缩不下去，会把 390px 撑到 505px。min-width:0 才允许它缩到内容以下 */
+  .release-picker { flex-wrap: wrap; }
+  .release-picker select { min-width: 0; flex: 1 1 100%; max-width: 100%; }
 }

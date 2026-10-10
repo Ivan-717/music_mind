@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiSearch } from '@/api/search'
 import { apiArtistLookup } from '@/api/artist'
+import { apiQueueArtist } from '@/api/ingestion'
 import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import CoverImage from '@/components/CoverImage.vue'
 import { useDisplay } from '@/composables/useDisplay'
@@ -18,6 +19,41 @@ const result = ref(null)
 const favIds = ref(new Set())
 const loading = ref(false)
 const error = ref('')
+
+// 「补全专辑」的进行态与反馈（每个歌手都能补全，哪怕库里已有一些——
+// 常听的歌手往往只缺后期的几张；已经全有的话后端如实回「没有新的可抓」）
+const artistBusy = ref(null)
+const artistNotice = ref('')
+const artistImportId = ref(null)
+
+async function completeArtist({ mbid, artistId, name, key }) {
+  if (artistBusy.value) return
+  artistBusy.value = key
+  artistNotice.value = ''
+  artistImportId.value = null
+  try {
+    const r = await apiQueueArtist({
+      ...(mbid ? { mbid } : {}),
+      ...(artistId ? { artistId } : {}),
+      artistName: name
+    })
+    if (!r.found) {
+      artistNotice.value = 'MusicBrainz 上没有找到可补的录音室专辑'
+    } else if (!r.queued) {
+      artistNotice.value = `${r.found} 张专辑都已在库里，没有新的可抓`
+    } else {
+      const mins = Math.ceil((r.estimateSeconds || 0) / 60)
+      artistNotice.value = `已排进队列 ${r.queued} 张`
+        + (r.skippedQueued ? `（${r.skippedQueued} 张已在库里或在队列里）` : '')
+        + `，约 ${mins} 分钟。抓完再搜就有结果了`
+    }
+    artistImportId.value = r.importId || null
+  } catch (e) {
+    artistNotice.value = e.response?.data?.message || e.message
+  } finally {
+    artistBusy.value = null
+  }
+}
 const busyId = ref(null)
 
 /** 点 ▶：交给全局播放器。没有 hasPreview 的行不渲染按钮 */
@@ -128,9 +164,12 @@ async function loadLookup(q) {
   }
 }
 
+// 【playlistHits 也要算进来】搜库里没有的歌（中文歌的多数情况）时，
+// 本地三个列表全空、而第二来源有货 —— 不算它整块都不渲染，正是最需要它的时候
 const hasAny = computed(() =>
   !!result.value &&
-  (result.value.artists.length || result.value.albums.length || result.value.tracks.length))
+  (result.value.artists.length || result.value.albums.length
+   || result.value.tracks.length || (result.value.playlistHits?.length || 0)))
 
 /**
  * 默认展示哪一块：歌曲优先，为空退到专辑，再为空退到歌手。
@@ -165,6 +204,13 @@ watch(() => route.query.q, (q) => search(q))
   <template v-else>
     <h2>「{{ fmt(result.keyword) }}」</h2>
     <div class="rule"></div>
+
+    <!-- 补全专辑的反馈。可能"0 张"——都在库里了，如实说，别让用户以为点了没反应 -->
+    <p v-if="artistNotice" class="notice">
+      {{ artistNotice }}
+      <RouterLink v-if="artistImportId"
+                  :to="`/my-playlist?import=${artistImportId}`">去「AI 帮你找的」看进度 →</RouterLink>
+    </p>
     <p v-if="result.variants.length > 1" class="variants">
       已同时检索繁简两种写法：{{ result.variants.join(' / ') }}
     </p>
@@ -198,8 +244,46 @@ watch(() => route.query.q, (q) => search(q))
         <li v-for="a in result.artists" :key="a.id">
           <RouterLink class="name" :to="`/artists/${a.id}`">{{ fmt(a.name) }}</RouterLink>
           <span class="disambig" v-if="a.disambiguation">{{ a.disambiguation }}</span>
+          <!-- 每个歌手都能补全：库里已有的专辑排队时会跳过，没有新的就如实回 -->
+          <button
+            class="grab"
+            :disabled="!!artistBusy"
+            :title="`把 ${a.name} 在 MusicBrainz 上的录音室专辑（最多 10 张）排进抓取队列`"
+            @click="completeArtist({ artistId: a.id, name: a.name, key: 'a' + a.id })"
+          >{{ artistBusy === 'a' + a.id ? '排队中…' : '补全专辑' }}</button>
         </li>
       </ul>
+    </section>
+
+    <!-- 第二来源：你歌单里还没入库的。库里搜不到的中文歌往往在这儿——
+         「消失」变成「看得见、有状态、能试听」 -->
+    <section v-if="activeTab === 'songs' && result.playlistHits?.length" class="search-section">
+      <h3 class="section-title">
+        你歌单里还没入库的 <span class="count">{{ result.playlistHits.length }}</span>
+      </h3>
+      <ul class="track-list">
+        <li v-for="h in result.playlistHits" :key="h.rowId"
+            :class="{ playing: player.isCurrent('n' + h.externalId) }">
+          <span class="name">{{ fmt(h.title) }}</span>
+          <span class="artist">{{ fmt(h.artists) }}</span>
+          <span class="album">{{ fmt(h.albumName) }}</span>
+          <button
+            v-if="h.provider === 'netease'"
+            class="play"
+            :class="{ on: player.isCurrent('n' + h.externalId) }"
+            :title="player.isCurrent('n' + h.externalId) && player.playing
+              ? '暂停' : '播放（网易云外链，整首歌）'"
+            @click="player.playNetease({ externalId: h.externalId, name: h.title,
+                                          artists: h.artists, coverUrl: h.coverUrl })"
+          >{{ player.isCurrent('n' + h.externalId) && player.playing ? '❚❚' : '▶' }}</button>
+          <span v-else class="play" aria-hidden="true"></span>
+          <span class="dur">{{ fmtDuration(h.durationMs) }}</span>
+          <RouterLink class="album-link" :to="`/my-playlist?import=${h.importId}`">
+            在「{{ fmt(h.playlistName) }}」里
+          </RouterLink>
+        </li>
+      </ul>
+      <p class="more-hint">这些歌 MusicBrainz 上多半没有、入不了库 —— 但可以听。</p>
     </section>
 
     <section v-if="activeTab === 'albums' && result.albums.length" class="search-section">
@@ -285,12 +369,25 @@ watch(() => route.query.q, (q) => search(q))
 
             <span v-if="a.localId" class="state state-ok">已导入</span>
             <span v-else class="state state-todo">本地还没有</span>
+            <button
+              class="grab"
+              :disabled="!!artistBusy"
+              :title="`把 ${a.name} 在 MusicBrainz 上的录音室专辑（最多 10 张）排进抓取队列`"
+              @click="completeArtist({ mbid: a.mbid, name: a.name, key: 'm' + a.mbid })"
+            >{{ artistBusy === 'm' + a.mbid ? '排队中…' : '补全专辑' }}</button>
           </li>
         </ul>
 
+        <!-- 【别教用户跑命令行】原来是 `python data-pipeline/main.py "关键词"` ——
+             普通用户执行不了那句，等于"此路不通"。改成产品内可走的两条路：
+             去探索让 Agent 找代表专辑抓进来（先问，不自动抓），
+             或者导入一张包含 TA 的歌单 -->
         <p class="lookup-tip">
-          本地没有的歌手，用管道导入（跑完再回来搜就有结果了）：
-          <code>python data-pipeline/main.py "{{ result.keyword }}"</code>
+          本地没有这位歌手。可以
+          <RouterLink :to="{ path: '/explore', query: { q: `我想了解 ${result.keyword}` } }">
+            去音乐探索问一句「我想了解 {{ result.keyword }}」</RouterLink>，
+          让 Agent 查过之后把代表专辑抓进来；或者
+          <RouterLink to="/import">导入一张包含 TA 的歌单</RouterLink>。
         </p>
       </div>
 

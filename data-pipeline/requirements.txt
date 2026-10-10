@@ -2,3 +2,5 @@ requests
 pymysql
 python-dotenv
 pytest
+zhconv
+Pillow

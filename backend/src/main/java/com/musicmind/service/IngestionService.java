@@ -6,10 +6,12 @@ import com.musicmind.entity.IngestionJob;
 import com.musicmind.entity.UserPlaylistImport;
 import com.musicmind.entity.UserPlaylistTrack;
 import com.musicmind.exception.ApiException;
+import com.musicmind.mapper.ArtistMapper;
 import com.musicmind.mapper.IngestionJobMapper;
 import com.musicmind.mapper.UserPlaylistMapper;
 import com.musicmind.util.ArtistText;
 import com.musicmind.vo.IngestionJobVO;
+import com.musicmind.vo.MbReleaseCandidateVO;
 import com.musicmind.vo.IngestionQueueResultVO;
 import com.musicmind.vo.IngestionStatusVO;
 import com.musicmind.vo.TrackMatchVO;
@@ -53,6 +55,11 @@ public class IngestionService {
     private final ImportService importService;
     private final IngestionWorker worker;
     private final IngestionProperties props;
+    private final MusicBrainzLookupService lookupService;
+    private final ArtistMapper artistMapper;
+
+    /** 「补全专辑」一次最多排几张。10 张 ≈ 70 秒抓完，再多用户等不及也未必想要 */
+    private static final int ARTIST_COMPLETE_LIMIT = 10;
 
     // ============================================================
     // 排队
@@ -100,6 +107,42 @@ public class IngestionService {
      *
      * 副作用是**省一次 MusicBrainz 请求** —— 而且避免了「搜出来挑了另一张版本」。
      */
+    /**
+     * 「补全这位歌手的专辑」（搜索页的入口，2026-10-09）。
+     *
+     * 查 MB 拿 top 专辑 → 走 queueAgentFetch 同一条排队链 —— 那边自带幂等
+     * （external_id 用 release mbid，重复排不产生第二行，已抓过的会 skip）。
+     * **可能排 0 张**（都在库里了）—— 如实返回 found/skippedQueued，
+     * 前端必须显示「没有新的可抓」，别让用户以为点了没反应。
+     *
+     * mbid 与 artistId 二选一：上游 lookup 的条目带 mbid；
+     * 本地搜索结果的条目只有 id，反查一下（artist 表 100% 有 mbid —— 入库都从 MB 来）。
+     */
+    public Map<String, Object> queueArtist(Long userId, String mbid, Long artistId,
+                                           String artistName) {
+        String resolved = mbid;
+        if ((resolved == null || resolved.isBlank()) && artistId != null) {
+            resolved = artistMapper.selectMbidById(artistId);
+        }
+        if (resolved == null || resolved.isBlank()) {
+            throw new ApiException(400, "这位歌手没有 MusicBrainz ID，补全不了");
+        }
+
+        List<MbReleaseCandidateVO> releases =
+                lookupService.findArtistReleases(resolved, ARTIST_COMPLETE_LIMIT);
+        List<AgentFetchRequest.Proposal> proposals = new ArrayList<>();
+        for (MbReleaseCandidateVO r : releases) {
+            AgentFetchRequest.Proposal p = new AgentFetchRequest.Proposal();
+            p.setReleaseMbid(r.getMbid());
+            p.setTitle(r.getTitle());
+            p.setArtist(artistName != null && !artistName.isBlank() ? artistName : r.getArtist());
+            proposals.add(p);
+        }
+        Map<String, Object> result = queueAgentFetch(userId, proposals);
+        result.put("found", releases.size());     // 查回来几张（0 = 没有可补的专辑）
+        return result;
+    }
+
     public Map<String, Object> queueAgentFetch(Long userId, List<AgentFetchRequest.Proposal> proposals) {
         Long importId = ensureAgentImport(userId);
 
@@ -190,6 +233,7 @@ public class IngestionService {
         int alreadyMatched = 0;
         int alreadyQueued = 0;
         int invalid = 0;
+        int notFound = 0;
 
         for (UserPlaylistTrack row : rows) {
             String artist = ArtistText.primary(row.getArtists());
@@ -215,6 +259,14 @@ public class IngestionService {
                 continue;
             }
 
+            // 【第三道：确认过 MB 没有的不白排】上面两道只挡活跃的 —— 历史
+            // NOT_FOUND 挡不住，用户反复点就反复白排队（worker 每轮白花 4 秒）。
+            // 如实计数返回，前端显示「N 首 MusicBrainz 上确实没有」
+            if (jobMapper.countNotFoundByArtistTitle(artist, row.getTitle()) > 0) {
+                notFound++;
+                continue;
+            }
+
             IngestionJob job = new IngestionJob();
             job.setUserId(userId);
             job.setTrackRowId(row.getId());
@@ -232,6 +284,7 @@ public class IngestionService {
         result.setSkippedAlreadyMatched(alreadyMatched);
         result.setSkippedQueued(alreadyQueued);
         result.setSkippedInvalid(invalid);
+        result.setSkippedNotFound(notFound);
         result.setQueueCount(queueCount);
         result.setEstimateSeconds(queueCount * SECONDS_PER_TRACK);
         return result;

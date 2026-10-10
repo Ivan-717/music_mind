@@ -57,9 +57,20 @@ export const usePlayerStore = defineStore('player', () => {
   })
   audio.addEventListener('ended', () => { playing.value = false })
   audio.addEventListener('error', () => {
-    // preview_url 会过期（schema 注释里写了）。第一版遇到就如实显示，
-    // 不自动重查 —— 那要再打一次 iTunes，而它有 20-25/分的限速
-    if (track.value) error.value = '试听暂时不可用'
+    const tr = track.value
+    // 【网易云 VIP 歌的 404 会走到这】带 trackId 的自动退到 iTunes 的 30 秒再试一次
+    // （usedFallback 防循环：备用也失败就如实报「不可用」）
+    // 其它来源的错误（preview_url 过期等）不自动重查 —— 那要再打一次 iTunes，
+    // 而它有 20-25/分的限速
+    if (tr && !tr.usedFallback && tr.externalId && tr.trackId) {
+      tr.usedFallback = true
+      apiTrackPreview(tr.trackId)
+        .then((r) => { audio.src = r.url; return audio.play() })
+        .then(() => { error.value = ''; playing.value = true })
+        .catch(() => { error.value = '试听暂时不可用'; playing.value = false })
+      return
+    }
+    if (tr) error.value = '试听暂时不可用'
     playing.value = false
   })
 
@@ -67,26 +78,70 @@ export const usePlayerStore = defineStore('player', () => {
     duration.value > 0 ? Math.min(1, current.value / duration.value) : 0
   )
 
-  /** 点某一首：同一首 = 播放/暂停切换；换一首 = 换源播放 */
+  /**
+   * 点某一首：同一首 = 播放/暂停切换；换一首 = 换源播放。
+   *
+   * 【音源优先级】有 externalId（网易云 id，导入歌单来的）先用外链——
+   * 它给**整首歌**；失败（VIP 歌 404）onerror 里自动退 iTunes 的 30 秒。
+   * 没有 externalId 的（MB 来源的歌）直接用 /tracks/{id}/preview。
+   * 「当前播放中」的判定统一走 key（调用方给）。
+   */
   async function play(t) {
-    if (track.value?.trackId === t.trackId) return toggle()
+    const key = t.key ?? String(t.trackId)
+    if (track.value?.key === key) return toggle()
+    if (!t.externalId && !t.trackId) {
+      track.value = { ...t, key }
+      error.value = '试听暂时不可用'
+      return
+    }
 
     // 【先摆上 track 再请求】播放条立刻出现（显示「加载中」的样子），
     // 而不是点完等 200ms 没反应
-    track.value = t
+    track.value = { ...t, key, usedFallback: false }
     current.value = 0
     duration.value = 30
     error.value = ''
     try {
-      const r = await apiTrackPreview(t.trackId)
-      audio.src = r.url
+      const url = t.externalId
+        ? `https://music.163.com/song/media/outer/url?id=${t.externalId}.mp3`
+        : (await apiTrackPreview(t.trackId)).url
+      audio.src = url
       await audio.play()
       playing.value = true
-      reportListen(t.trackId)     // 真的开始播了才报（404 的不算）
+      // 未入库的歌不上报：play_history.track_id 有外键，null 会炸
+      if (t.trackId) reportListen(t.trackId)
     } catch (e) {
       error.value = '试听暂时不可用'
       playing.value = false
     }
+  }
+
+  /**
+   * 带网易云 id 的歌（导入歌单来的，入库与否都算）：整曲优先。
+   * 已对齐的传 trackId 当兜底（VIP 歌 404 时自动退 iTunes 30 秒）；
+   * 未入库的没有 trackId，404 就如实说不可用。
+   * 入参：{ externalId, trackId?, name, artists, coverUrl }
+   */
+  function playNetease(row) {
+    return play({
+      key: row.externalId ? 'n' + row.externalId : String(row.trackId),
+      externalId: row.externalId,
+      trackId: row.trackId,
+      name: row.name,
+      artistNames: row.artists,
+      coverUrl: row.coverUrl
+    })
+  }
+
+  /**
+   * 跳到整段的比例位置（进度条点击）。时长还没加载出来（metadata 未到）时忽略——
+   * 这时 audio.duration 是 NaN，设 currentTime 会抛。
+   */
+  function seekTo(ratio) {
+    if (!track.value || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+    const r = Math.min(1, Math.max(0, ratio))
+    audio.currentTime = r * audio.duration
+    current.value = audio.currentTime     // 立即反映；timeupdate 稍后才回来
   }
 
   function toggle() {
@@ -111,8 +166,9 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   /** 当前行是不是这一首（列表里高亮播放行用） */
-  const isCurrent = (trackId) => track.value?.trackId === trackId
+  /** 当前行是不是这一首。入参可以是 trackId（数字）或未对齐歌的 key（'n'+externalId） */
+  const isCurrent = (id) => track.value != null && track.value.key === String(id)
 
   return { track, playing, current, duration, error, progress,
-           play, toggle, close, isCurrent }
+           play, playNetease, toggle, seekTo, close, isCurrent }
 })

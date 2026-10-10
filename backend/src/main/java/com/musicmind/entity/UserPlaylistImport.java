@@ -11,6 +11,8 @@ public class UserPlaylistImport {
     private String provider;
     private String externalPlaylistId;
     private String playlistName;
+    /** 歌单标签（网易云给的，逗号分隔）——口味的粗粒度信号 */
+    private String tags;
     private String sourceUrl;
     private Integer trackCount;
     private LocalDateTime lastImportedAt;

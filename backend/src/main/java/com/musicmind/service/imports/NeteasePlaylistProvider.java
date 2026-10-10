@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -43,6 +44,8 @@ public class NeteasePlaylistProvider implements PlaylistProvider {
 
     private static final String V6_API = "https://music.163.com/api/v6/playlist/detail?id=";
     private static final String V3_SONG_API = "https://music.163.com/api/v3/song/detail?c=";
+    /** v1 的专辑详情还活着（v3 的精简掉了 publishTime，v1 song/detail 已经死了）。逐张查 */
+    private static final String V1_ALBUM_API = "https://music.163.com/api/v1/album/";
 
     /** 一次换多少首详情。144 首的 URL 约 5KB，多数服务器 8KB 上限撑得住，
      *  但别贴着边——200 留了余量。 */
@@ -128,9 +131,57 @@ public class NeteasePlaylistProvider implements PlaylistProvider {
         playlist.setProvider(name());
         playlist.setExternalId(id);          // 落库去重靠它
         playlist.setName(playlistNode.path("name").asText("未命名歌单"));
+        playlist.setTags(tagsOf(playlistNode));
+        fillReleaseYears(tracks);
         playlist.setTracks(tracks);
         log.info("网易云歌单 {} 抓到 {} 首（id 总数 {}）", id, tracks.size(), ids.size());
         return playlist;
+    }
+
+    /** 歌单标签（用户建的歌单才有；榜单类的是空数组 → null）。口味的粗粒度信号 */
+    private String tagsOf(JsonNode playlistNode) {
+        List<String> tags = new ArrayList<>();
+        for (JsonNode t : playlistNode.path("tags")) {
+            String s = t.asText("");
+            if (!s.isEmpty()) {
+                tags.add(s);
+            }
+        }
+        return tags.isEmpty() ? null : String.join(",", tags);
+    }
+
+    /**
+     * 批量补发行年 —— v3 歌详情没有，逐张专辑查 v1 接口（实测还活着的唯一路径）。
+     * 按专辑 id 去重（一张专辑在歌单里常有好多首），单张失败置 null 不阻断导入。
+     * 量级：200 首的歌单 ≈ 30-60 张专辑 ≈ 十几秒，可接受。
+     */
+    private void fillReleaseYears(List<ParsedTrack> tracks) {
+        Map<Long, Integer> yearCache = new HashMap<>();
+        for (ParsedTrack t : tracks) {
+            Long albumId = t.getAlbumId();
+            if (albumId == null || albumId <= 0) {
+                continue;
+            }
+            if (!yearCache.containsKey(albumId)) {
+                yearCache.put(albumId, fetchAlbumYear(albumId));
+            }
+            t.setReleaseYear(yearCache.get(albumId));
+        }
+    }
+
+    private Integer fetchAlbumYear(Long albumId) {
+        try {
+            JsonNode root = getJson(V1_ALBUM_API + albumId);
+            long ms = root.path("album").path("publishTime").asLong(0);
+            if (ms <= 0) {
+                return null;
+            }
+            // publishTime 是 epoch 毫秒（东八区取年，防止跨年夜的发行日被切到前一年）
+            return java.time.Instant.ofEpochMilli(ms)
+                    .atZone(java.time.ZoneOffset.ofHours(8)).getYear();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private List<ParsedTrack> fetchDetails(List<Long> ids) {
@@ -160,6 +211,7 @@ public class NeteasePlaylistProvider implements PlaylistProvider {
             track.setTitle(title);
             // v3 的字段是缩写的：al=album, ar=artists, dt=duration(ms)
             track.setAlbumName(song.path("al").path("name").asText(""));
+            track.setAlbumId(song.path("al").path("id").asLong(0));
             track.setDurationMs(song.path("dt").asLong(0));
             track.setArtists(namesOf(song.path("ar")));
             // 封面在 al.picUrl 里，实测可直接访问、不防盗链。

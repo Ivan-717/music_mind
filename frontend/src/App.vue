@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useSettingsStore } from '@/stores/settings'
@@ -32,6 +32,10 @@ function logout() {
   store.clear()
   router.replace('/login')
 }
+
+// 刷新后把用户名找回来：token 在 localStorage 里活着，user 只在内存里（登录时赋值）——
+// 不补这一下，导航栏右上角刷新就变空（fetchMe 内部自判 token/user，不会重复请求）
+onMounted(() => { store.fetchMe() })
 </script>
 
 <template>

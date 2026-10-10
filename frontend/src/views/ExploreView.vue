@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream } from '@/api/chat'
-import { apiCreatePlaylistFromTracks } from '@/api/playlist'
 import { apiRunStatus } from '@/api/persona'
 import { useDisplay } from '@/composables/useDisplay'
+import SavePlaylistButton from '@/components/SavePlaylistButton.vue'
 
 const { fmt } = useDisplay()
+const route = useRoute()
 
 const conversations = ref([])
 const current = ref(null)        // 会话 id
@@ -37,7 +39,7 @@ const progress = computed(() =>
  * **Java 那边原样透传不解析**，所以在这里解。user 的是纯文本。
  */
 function parse(content) {
-  const empty = { answer: content || '', recommendations: [], fetch_proposals: [] }
+  const empty = { answer: content || '', recommendations: [], fetch_proposals: [], path: null }
   if (typeof content !== 'string' || !content.trimStart().startsWith('{')) return empty
   try {
     const j = JSON.parse(content)
@@ -45,7 +47,12 @@ function parse(content) {
       answer: j.answer || '',
       recommendations: j.recommendations || [],
       // 没有提议时也要给个空数组 —— 模板里直接 .length，undefined 会炸
-      fetch_proposals: j.fetch_proposals || []
+      fetch_proposals: j.fetch_proposals || [],
+      // 【M6 的探索路径】后端一直在返回这个字段（chat.py 的 _resolve_path），
+      // 而这里从来没取过它 —— 模板里的整条路径渲染（竖线 + 每站「抓进库里」）
+      // 是死代码，「我想了解 Britpop」的路径从来没显示过。
+      // 旧消息没有这个键 → null → 不渲染（零成本兼容）
+      path: j.path || null
     }
   } catch (e) {
     return empty
@@ -60,33 +67,17 @@ const rendered = computed(() =>
 const fetching = ref(false)
 const fetched = ref('')
 
-// 把这一轮的推荐存成一张自己的歌单
-const saving = ref(false)
-const saved = ref('')
+/** 抓取排队落在哪张歌单 —— 排完队要告诉用户"去哪收货"（原来只说"抓完再问一次"） */
+const fetchedImportId = ref(null)
 
-async function savePlaylist(idx) {
-  const msg = rendered.value[idx]
-  const ids = (msg.recommendations || []).map((r) => r.track_id).filter(Boolean)
-  if (!ids.length || saving.value) return
-
-  // 默认名用**上一句问的话** —— 「推荐几首安静的」本身就是个好名字，
-  // 比从回答里截一段通顺得多
+/**
+ * 存歌单的默认名 = **上一句问的话**（「推荐几首安静的」本身就是个好名字，
+ * 比从回答里截一段通顺）。命名和保存都在 SavePlaylistButton 里
+ * （内联输入，不用 window.prompt —— 移动端 webview 会拦它）
+ */
+function prevQuestion(idx) {
   const prev = [...rendered.value.slice(0, idx)].reverse().find((m) => m.role === 'user')
-  const fallback = (prev?.answer || 'AI 推荐').replace(/\s+/g, ' ').slice(0, 24)
-  const name = window.prompt('歌单叫什么？', fallback)
-  if (!name || !name.trim()) return
-
-  saving.value = true
-  error.value = ''
-  try {
-    const r = await apiCreatePlaylistFromTracks(name.trim(), ids)
-    saved.value = `已存成歌单「${r.name}」，${r.added} 首`
-      + (r.skipped ? `（${r.skipped} 首库里已不存在，跳过）` : '')
-  } catch (e) {
-    error.value = e.response?.data?.message || e.message
-  } finally {
-    saving.value = false
-  }
+  return (prev?.answer || 'AI 推荐').replace(/\s+/g, ' ')
 }
 
 /**
@@ -106,6 +97,7 @@ async function fetchOne(node) {
       title: node.release_title || node.name,
       artist: node.release_artist || node.name
     }])
+    fetchedImportId.value = r.importId || null
     const mins = Math.ceil((r.estimateSeconds || 0) / 60)
     fetched.value = `已把《${node.release_title || node.name}》排进队列`
       + (r.skippedQueued ? '（已经在队列里了）' : `，约 ${mins} 分钟`)
@@ -128,6 +120,7 @@ async function fetchAll(msg) {
       releaseMbid: p.release_mbid, title: p.title, artist: p.artist,
       year: p.year, why: p.why
     })))
+    fetchedImportId.value = r.importId || null
     const mins = Math.ceil((r.estimateSeconds || 0) / 60)
     fetched.value = `已排进队列 ${r.queued} 张`
       + (r.skippedQueued ? `，${r.skippedQueued} 张已经在队列里` : '')
@@ -244,6 +237,11 @@ onMounted(async () => {
   // 默认打开最新那个会话 —— 回来就是想接着聊
   if (conversations.value.length) await openConversation(conversations.value[0].id)
   loading.value = false
+
+  // 从别处带问题进来（搜索页的「去音乐探索问一句」走这条）：
+  // **只预填，不自动发送** —— 一次问答 20-40 秒 + 一次 LLM 调用，
+  // 不能替用户按下去
+  if (route.query.q) question.value = String(route.query.q)
 })
 
 // 空态的点播单。点了直接就发 —— 「先点一下填进输入框、再按发送」
@@ -290,8 +288,11 @@ function usePrompt(t) {
   </p>
 
   <p v-if="error" class="err">{{ error }}</p>
-  <p v-if="fetched" class="notice">{{ fetched }}</p>
-  <p v-if="saved" class="notice">{{ saved }}</p>
+  <p v-if="fetched" class="notice">
+    {{ fetched }}
+    <RouterLink v-if="fetchedImportId"
+                :to="`/my-playlist?import=${fetchedImportId}`">去「AI 帮你找的」看进度 →</RouterLink>
+  </p>
 
   <div v-if="pollStopped" class="err">
     <p>和服务器失去联系了（连着 {{ POLL_MAX_FAILURES }} 次没连上）。任务可能还在后台跑。</p>
@@ -349,12 +350,12 @@ function usePrompt(t) {
           </li>
         </ul>
 
-        <!-- 把推荐存成自己的歌单。用现成的歌单 CRUD，后端一次建好并灌满 -->
-        <p v-if="m.recommendations.length" class="save-row">
-          <button :disabled="saving" @click="savePlaylist(mi)">
-            {{ saving ? '保存中…' : `存成歌单（${m.recommendations.length} 首）` }}
-          </button>
-        </p>
+        <!-- 把推荐存成自己的歌单。命名/保存/跳转都在共用组件里（报告页也用同一件） -->
+        <SavePlaylistButton
+          v-if="m.recommendations.length"
+          :track-ids="m.recommendations.map((r) => r.track_id).filter(Boolean)"
+          :default-name="prevQuestion(mi)"
+        />
 
         <!-- 库里没有、但上游有。**抓不抓由用户点** —— 不自动抓 -->
         <ul v-if="m.fetch_proposals.length" class="fetch-list">

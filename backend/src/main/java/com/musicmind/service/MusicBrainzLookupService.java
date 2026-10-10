@@ -87,6 +87,58 @@ public class MusicBrainzLookupService {
     }
 
     /**
+     * 这位歌手在 MusicBrainz 上的专辑列表（「补全专辑」用，2026-10-09）。
+     *
+     * 【一次点击只花 1 个请求】inc=release-groups 让每个 release 直接带回
+     * primary/secondary type，不用逐张再查；限速/重试/UA 全走 getJson。
+     * 只要录音室专辑：primary-type = Album 且 secondary-types 不含
+     * Compilation / Live / Remix —— 补全要的是作品，不是现场和精选。
+     */
+    public List<MbReleaseCandidateVO> findArtistReleases(String artistMbid, int limit) {
+        String url = baseUrl + "/release?artist=" + artistMbid
+                + "&inc=release-groups&limit=" + Math.max(limit * 3, 30) + "&fmt=json";
+        JsonNode root = getJson(url);
+        List<MbReleaseCandidateVO> out = new ArrayList<>();
+        for (JsonNode node : root.path("releases")) {
+            JsonNode rg = node.path("release-group");
+            if (!"Album".equals(rg.path("primary-type").asText(""))) {
+                continue;
+            }
+            boolean skip = false;
+            for (JsonNode sec : rg.path("secondary-types")) {
+                String t = sec.asText("");
+                if (t.equals("Compilation") || t.equals("Live") || t.equals("Remix")
+                        || t.equals("DJ-mix") || t.equals("Mixtape/Street")) {
+                    skip = true;
+                    break;
+                }
+            }
+            if (skip) {
+                continue;
+            }
+
+            MbReleaseCandidateVO vo = new MbReleaseCandidateVO();
+            vo.setMbid(node.path("id").asText(null));
+            vo.setTitle(node.path("title").asText(null));
+            vo.setDate(node.path("date").asText(null));
+            vo.setStatus(node.path("status").asText(null));
+            vo.setPrimaryType("Album");
+            vo.setReleaseGroupTitle(rg.path("title").asText(null));
+            JsonNode credit = node.path("artist-credit");
+            if (credit.isArray() && credit.size() > 0) {
+                vo.setArtist(credit.get(0).path("name").asText(null));
+            }
+            if (vo.getMbid() != null) {
+                out.add(vo);
+            }
+            if (out.size() >= limit) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
      * 发一次 GET 并解析 JSON。限速、UA、错误码、重试、JSON 解析全在这儿，两个查询共用。
      *
      * 【503 要重试，不能直接抛】限速是 1 请求/秒，我们正好卡在这个边界上，

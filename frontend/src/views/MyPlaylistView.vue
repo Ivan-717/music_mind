@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   apiListImports, apiImportTracks, apiDeleteImport,
   apiRemoveImportTrack, apiFavoriteAll
@@ -11,17 +12,37 @@ import {
 } from '@/api/ingestion'
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
+import CreatedPlaylistPanel from '@/components/CreatedPlaylistPanel.vue'
 
 const { fmt, fmtDuration, providerLabel } = useDisplay()
 const player = usePlayerStore()
 
-/** 点 ▶：交给全局播放器。曲目用的是对齐后的本地 id（matchedTrackId），
- *  未对齐的行没有 id、也没有按钮（v-if="t.hasPreview" 挡着） */
-function playTrack(t) {
-  player.play({
+const currentPlaylist = computed(
+  () => playlists.value.find((p) => p.id === currentId.value) || null)
+
+/** 播放 key 的统一规则（必须和 store.play 一致）：有网易云 id 用 'n'+id，否则 trackId */
+function rowKey(t) {
+  return (t.externalId && currentPlaylist.value?.provider === 'netease')
+    ? 'n' + t.externalId
+    : String(t.matchedTrackId)
+}
+
+/** 有没有可播的音源：网易云外链（netease 歌单的每一行）或 iTunes（已对齐且有试听） */
+function canPlay(t) {
+  if (currentPlaylist.value?.provider === 'netease' && t.externalId) return true
+  return !!t.hasPreview
+}
+
+/**
+ * 点 ▶：**网易云优先**——外链给的是整首歌，比 iTunes 的 30 秒片段好。
+ * 已对齐的行带 trackId 兜底：VIP 歌 404 时 store 自动退 iTunes 试听。
+ */
+function playRow(t) {
+  player.playNetease({
+    externalId: currentPlaylist.value?.provider === 'netease' ? t.externalId : null,
     trackId: t.matchedTrackId,
     name: t.title,
-    artistNames: t.artists,
+    artists: t.artists,
     coverUrl: t.coverUrl
   })
 }
@@ -30,6 +51,27 @@ const PAGE_SIZE = 50
 
 const playlists = ref([])
 const currentId = ref(null)
+
+// ============================================================
+// 来源 tab：「导入的」vs「我建的」（2026-10-08）
+//
+// 两种心智模型：「导入的」是把外部的一份列表搬进来（外部文本、要等对齐）；
+// 「我建的」是 AI 推荐存下来的本地曲目（数据形状完全不同）。
+// 组件层面也分开：我建的那边是独立组件，不在这个 750 行的文件里做 v-if 分流
+// ============================================================
+const route = useRoute()
+const router = useRouter()
+const source = ref(route.query.source === 'created' ? 'created' : 'import')
+
+function switchSource(s) {
+  if (source.value === s) return
+  source.value = s
+  // tab 同步进 URL（刷新还在这一页）——replace 不往历史里堆
+  const q = { ...route.query }
+  if (s === 'created') q.source = 'created'
+  else delete q.source
+  router.replace({ query: q })
+}
 const pageData = ref(null)
 
 /**
@@ -166,7 +208,11 @@ async function loadPlaylists() {
     playlists.value = await apiListImports()
     const stillThere = playlists.value.some((p) => p.id === currentId.value)
     if (!stillThere) {
-      currentId.value = playlists.value.length ? playlists.value[0].id : null
+      // 深链：?import=<id> 优先（探索页「去收货」链接走这条），否则第一张
+      const want = Number(route.query.import)
+      const target = playlists.value.find((p) => p.id === want)
+      currentId.value = target ? target.id
+        : (playlists.value.length ? playlists.value[0].id : null)
       pageData.value = null
     }
     if (currentId.value) await loadTracks(currentId.value, 1)
@@ -416,6 +462,7 @@ function ingestSummary(r) {
   let text = `已排队 ${r.queued} 首`
   if (r.skippedAlreadyMatched) text += `，${r.skippedAlreadyMatched} 首刚入库就能对上（已直接收录）`
   if (r.skippedQueued) text += `，${r.skippedQueued} 首已在队列里`
+  if (r.skippedNotFound) text += `，${r.skippedNotFound} 首之前确认过 MusicBrainz 上没有`
   if (r.skippedInvalid) text += `，${r.skippedInvalid} 首信息不全跳过`
   return text
 }
@@ -522,6 +569,21 @@ watch(currentId, (id) => {
   <h2>我的歌单</h2>
   <div class="rule"></div>
 
+  <!-- 来源切换：「导入的」是搬来的外部列表，「我建的」是 AI 推荐存下来的 -->
+  <div class="status-tabs">
+    <button :class="{ active: source === 'import' }" @click="switchSource('import')">
+      导入的<span v-if="playlists.length" class="count">{{ playlists.length }}</span>
+    </button>
+    <button :class="{ active: source === 'created' }" @click="switchSource('created')">
+      我建的
+    </button>
+  </div>
+
+  <template v-if="source === 'created'">
+    <CreatedPlaylistPanel />
+  </template>
+
+  <template v-else>
   <p v-if="error" class="err">{{ error }}</p>
   <p v-if="ingestError" class="err">{{ ingestError }}</p>
   <p v-if="notice" class="notice">{{ notice }}</p>
@@ -665,7 +727,7 @@ watch(currentId, (id) => {
         <li
           v-for="t in items"
           :key="t.id"
-          :class="{ picked: selected.has(t.id), playing: player.isCurrent(t.matchedTrackId) }"
+          :class="{ picked: selected.has(t.id), playing: player.isCurrent(rowKey(t)) }"
         >
           <input
             class="pick"
@@ -688,15 +750,15 @@ watch(currentId, (id) => {
           <span class="name">{{ fmt(t.title) }}</span>
           <span class="artist">{{ fmt(t.artists) }}</span>
           <span class="album">{{ fmt(t.albumName) }}</span>
-          <!-- 没有试听源的曲目【不给按钮】——给一个播不了的按钮比不给更糟 -->
+          <!-- 可播的给按钮：网易云整曲优先，已对齐的失败自动退 iTunes 30 秒；
+               没有任何音源的给同宽空位，列才对得齐 -->
           <button
-            v-if="t.hasPreview"
+            v-if="canPlay(t)"
             class="play"
-            :class="{ on: player.isCurrent(t.matchedTrackId) }"
-            :title="player.isCurrent(t.matchedTrackId) && player.playing ? '暂停' : '试听 30 秒'"
-            @click="playTrack(t)"
-          >{{ player.isCurrent(t.matchedTrackId) && player.playing ? '❚❚' : '▶' }}</button>
-          <!-- 没试听的给同宽空位 —— 否则两行的列对不齐 -->
+            :class="{ on: player.isCurrent(rowKey(t)) }"
+            :title="player.isCurrent(rowKey(t)) && player.playing ? '暂停' : '播放'"
+            @click="playRow(t)"
+          >{{ player.isCurrent(rowKey(t)) && player.playing ? '❚❚' : '▶' }}</button>
           <span v-else class="play" aria-hidden="true"></span>
           <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
           <span class="state" :class="t.matchStatus.toLowerCase()">
@@ -747,5 +809,6 @@ watch(currentId, (id) => {
         </button>
       </div>
     </template>
+  </template>
   </template>
 </template>

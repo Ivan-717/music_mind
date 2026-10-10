@@ -9,6 +9,8 @@ import { apiListImports } from '@/api/import'
 import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import { usePlayerStore } from '@/stores/player'
 import { useDisplay } from '@/composables/useDisplay'
+import SavePlaylistButton from '@/components/SavePlaylistButton.vue'
+import { estimateCost, RATES_UPDATED } from '@/utils/pricing'
 
 const { fmt } = useDisplay()
 const player = usePlayerStore()
@@ -36,7 +38,7 @@ const MIN_ANALYZABLE = 20   // 和 agent-service 的 evidence.MIN_TRACKS 一致
 const DIM_LABEL = {
   genre: '流派', era: '年代', artist: '常听艺人', mood_energy: '音乐能量',
   album_form: '专辑形态', duration: '曲目时长', diversity: '探索度',
-  collaboration: '合作网络', region: '地区'
+  collaboration: '合作网络', region: '地区', unmatched: '未入库的那半边'
 }
 const CONF_LABEL = { high: '把握较大', medium: '中等', low: '仅供参考' }
 
@@ -251,6 +253,31 @@ const reportScopeLabel = computed(() => report.value?.report?.scope_label || '')
 
 /** 当前打开的报告 id（历史下拉的值）。没打开报告时空串，下拉显示空白 */
 const currentReportId = computed(() => report.value?.report?.id ?? '')
+
+/**
+ * 本次生成的消耗（token / 估价 / 用时）。
+ * 数据源：agent_report 的 tokens_in/tokens_out/latency_ms/llm_provider/llm_model ——
+ * MyBatis 返回 Map 时列名保持 snake_case（见上面 parseJson 的注释）。
+ * 【边界】数据不足的报告根本没调 LLM（tokens 全 null）→ 明说「没有调用模型」，
+ * 不显示 0（0 会被读成「白嫖了」）；latency 缺失就整段不显示。
+ */
+const genCostText = computed(() => {
+  const rep = report.value?.report
+  if (!rep) return ''
+  const hasTokens = rep.tokens_in != null || rep.tokens_out != null
+  if (!hasTokens) {
+    return rep.status === 'insufficient_data'
+      ? '这份报告没有调用模型（数据不足，只做了统计）' : ''
+  }
+  const parts = []
+  const who = [rep.llm_provider, rep.llm_model].filter(Boolean).join(' / ')
+  if (who) parts.push(who)
+  parts.push(`${(rep.tokens_in || 0).toLocaleString()} 进 / ${(rep.tokens_out || 0).toLocaleString()} 出`)
+  const cost = estimateCost(rep.llm_provider, rep.llm_model, rep.tokens_in, rep.tokens_out)
+  if (cost) parts.push(`≈ ${cost.text}`)
+  if (rep.latency_ms) parts.push(`用时 ${(rep.latency_ms / 1000).toFixed(1)} 秒`)
+  return '本次生成：' + parts.join(' · ')
+})
 
 /**
  * 历史下拉每一行的文案：意象名 · 日期。
@@ -658,6 +685,11 @@ onMounted(async () => {
           </p>
         </li>
       </ul>
+      <!-- 一键把这一批推荐存成歌单（和对话页共用一件；默认名用报告自己的意象名） -->
+      <SavePlaylistButton
+        :track-ids="body.recommendations.map((r) => r.track_id).filter(Boolean)"
+        :default-name="body.headline?.title"
+      />
     </section>
 
     <!-- 局限 -->
@@ -667,6 +699,12 @@ onMounted(async () => {
         <li v-for="(l, i) in body.limitations" :key="i">{{ fmt(l) }}</li>
       </ul>
     </section>
+
+    <!-- 本次生成的消耗。数据一直在 API 里，只是从来没展示过 -->
+    <p v-if="genCostText" class="muted gen-cost"
+       :title="`估价按未缓存价、费率更新于 ${RATES_UPDATED}；缓存命中的输入会便宜得多`">
+      {{ genCostText }}
+    </p>
 
     <!-- 追问 -->
     <section class="persona-ask">

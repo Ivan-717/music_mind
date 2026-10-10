@@ -54,11 +54,13 @@ public class ImportService {
             header.setProvider(playlist.getProvider());
             header.setExternalPlaylistId(playlist.getExternalId());
             header.setPlaylistName(playlist.getName());
+            header.setTags(playlist.getTags());
             header.setSourceUrl(url);
             header.setTrackCount(playlist.getTracks().size());
             userPlaylistMapper.insertImport(header);   // 回填 header.id
         } else {
             header.setPlaylistName(playlist.getName());
+            header.setTags(playlist.getTags());
             header.setSourceUrl(url);
             header.setTrackCount(playlist.getTracks().size());
             userPlaylistMapper.updateImport(header);
@@ -81,6 +83,7 @@ public class ImportService {
             row.setTitle(t.getTitle());
             row.setArtists(t.artistsText());
             row.setAlbumName(t.getAlbumName());
+            row.setReleaseYear(t.getReleaseYear());
             row.setDurationMs(t.getDurationMs());
             row.setCoverUrl(t.getCoverUrl());
             userPlaylistMapper.upsertTrack(row);

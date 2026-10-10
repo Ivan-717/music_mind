@@ -1,6 +1,7 @@
 package com.musicmind.service;
 
 import com.musicmind.mapper.SearchMapper;
+import com.musicmind.mapper.UserPlaylistMapper;
 import com.musicmind.util.KeywordVariants;
 import com.musicmind.vo.SearchVO;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +17,9 @@ public class SearchService {
     private static final int MAX_LIMIT = 100;
 
     private final SearchMapper searchMapper;
+    private final UserPlaylistMapper userPlaylistMapper;
 
-    public SearchVO search(String keyword, Integer limit) {
+    public SearchVO search(String keyword, Integer limit, Long userId) {
         SearchVO vo = new SearchVO();
         vo.setKeyword(keyword);
 
@@ -44,6 +46,10 @@ public class SearchService {
         vo.setTrackTotal(searchMapper.countTracks(v1, v2, v3));
         vo.setAlbumTotal(searchMapper.countAlbums(v1, v2, v3));
         vo.setArtistTotal(searchMapper.countArtists(v1, v2, v3));
+
+        // 第二来源：我歌单里还没入库的（MB 覆盖差的中文歌往往在这儿，
+        // 搜不到 → 搜得到、看得见状态、能试听）
+        vo.setPlaylistHits(userPlaylistMapper.searchUnmatched(userId, v1, v2, v3));
 
         return vo;
     }

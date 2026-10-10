@@ -133,6 +133,24 @@ public interface IngestionJobMapper {
                                  @Param("title") String title);
 
     /**
+     * 这套「歌手 + 歌名」之前是不是已经**确认过** MusicBrainz 上没有（NOT_FOUND）。
+     *
+     * 【为什么要有它】上面那道只挡「活跃的」——历史 NOT_FOUND 挡不住，用户对
+     * 一首 MB 上确实没有的歌反复点「入库」，每次都白排一轮（worker 搜 4 秒、
+     * 失败、再写一条 NOT_FOUND）。中文说唱那批歌全是这样。
+     * 代价：MB 将来真上架了这套名字，正常入口排不进来 —— 罕见的出口是
+     * 手动删掉那条历史 job，先不做工具（真遇到再说）。
+     */
+    @Select("""
+            SELECT COUNT(*) FROM ingestion_job
+            WHERE status = 'NOT_FOUND'
+              AND REPLACE(artist_name, ' ', '') = REPLACE(#{artistName}, ' ', '')
+              AND REPLACE(title, ' ', '') = REPLACE(#{title}, ' ', '')
+            """)
+    int countNotFoundByArtistTitle(@Param("artistName") String artistName,
+                                   @Param("title") String title);
+
+    /**
      * 同一歌手 + 同一专辑名，之前解析成功过的 release。
      *
      * 【这是省时间的关键一步】歌单里一张专辑常常有好几首（实测薛之谦一张专辑

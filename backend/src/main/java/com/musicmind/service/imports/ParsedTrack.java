@@ -29,6 +29,20 @@ public class ParsedTrack {
     private List<String> artists = List.of();
     private String title;
     private String albumName;
+
+    /**
+     * 平台的专辑 id（v3 的 al.id）。**只在抓取过程中用**（批量查发行年时按它去重），
+     * 不落库。
+     */
+    private Long albumId;
+
+    /**
+     * 发行年（网易云：专辑详情接口的 album.publishTime）。
+     * 【为什么值得多花一串请求】未入库的歌是画像的黑洞 —— 这半边占了近一半，
+     * 补齐发行年后「年代」维度至少能不偏。QQ 的平台字段里没有可靠来源，留 null。
+     */
+    private Integer releaseYear;
+
     private Long durationMs;
 
     /**

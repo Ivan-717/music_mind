@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * 按需入库（③）。
  *
@@ -35,6 +37,23 @@ public class IngestionController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public IngestionQueueResultVO queueTracks(@RequestBody IngestionTracksRequest req) {
         return ingestionService.queueTracks(CurrentUser.id(), req.getTrackRowIds());
+    }
+
+    /**
+     * 「补全这位歌手的专辑」（搜索页的入口，2026-10-09）。
+     *
+     * body: {mbid} 或 {artistId} —— 上游 lookup 的条目带 mbid，本地搜索的条目只有 id。
+     * artistName 可选，只用于歌单行标题（抓取本身只认 mbid）。
+     * 返回 {queued, skippedQueued, found, estimateSeconds, importId}；
+     * **found 可能是 0**（没有可补的专辑），前端要如实显示。
+     */
+    @PostMapping("/artist")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Map<String, Object> queueArtist(@RequestBody Map<String, Object> body) {
+        String mbid = body.get("mbid") == null ? null : String.valueOf(body.get("mbid"));
+        Long artistId = body.get("artistId") instanceof Number n ? n.longValue() : null;
+        String name = body.get("artistName") == null ? null : String.valueOf(body.get("artistName"));
+        return ingestionService.queueArtist(CurrentUser.id(), mbid, artistId, name);
     }
 
     /** 整单入库：这个歌单里所有还没对齐的曲目 */

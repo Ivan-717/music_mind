@@ -23,6 +23,9 @@ public class IngestionQueueResultVO {
     /** 歌名或歌手是空的，没法查（脏数据） */
     private int skippedInvalid;
 
+    /** 之前确认过 MusicBrainz 上没有（NOT_FOUND 的历史任务）—— 不白排，如实告诉用户 */
+    private int skippedNotFound;
+
     /** 排完之后队列总长 */
     private int queueCount;
 

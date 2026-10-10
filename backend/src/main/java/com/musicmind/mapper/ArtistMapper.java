@@ -72,4 +72,8 @@ ArtistMapper {
      */
     @Select("SELECT id FROM artist WHERE musicbrainz_id = #{mbid}")
     Long selectIdByMbid(@Param("mbid") String mbid);
+
+    /** 反查：本地 id → MusicBrainz ID（「补全专辑」从本地搜索结果发起时用） */
+    @Select("SELECT musicbrainz_id FROM artist WHERE id = #{id}")
+    String selectMbidById(@Param("id") Long id);
 }

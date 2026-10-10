@@ -19,3 +19,16 @@ export const apiMyPlaylists = () => http.get('/playlists')
  */
 export const apiCreatePlaylistFromTracks = (name, trackIds) =>
   http.post('/playlists/from-tracks', { name, trackIds })
+
+/** 一张自建歌单的曲目。无分页（自建歌单 ≤20 首，一次推荐的长度） */
+export const apiPlaylistTracks = (id) => http.get(`/playlists/${id}/tracks`)
+
+/** 改名（description/isPublic 后端支持，v1 不用） */
+export const apiRenamePlaylist = (id, name) =>
+  http.put(`/playlists/${id}`, { name })
+
+export const apiDeletePlaylist = (id) => http.delete(`/playlists/${id}`)
+
+/** 从歌单里移除一首 */
+export const apiRemovePlaylistTrack = (playlistId, trackId) =>
+  http.delete(`/playlists/${playlistId}/tracks/${trackId}`)
