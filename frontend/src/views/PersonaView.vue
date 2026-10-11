@@ -10,6 +10,7 @@ import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import { usePlayerStore } from '@/stores/player'
 import { useDisplay } from '@/composables/useDisplay'
 import SavePlaylistButton from '@/components/SavePlaylistButton.vue'
+import AddToPlaylistButton from '@/components/AddToPlaylistButton.vue'
 import { estimateCost, RATES_UPDATED } from '@/utils/pricing'
 
 const { fmt } = useDisplay()
@@ -676,6 +677,8 @@ onMounted(async () => {
               :title="favIds.has(r.track_id) ? '取消收藏' : '加入收藏'"
               @click="toggleFav(r.track_id)"
             >{{ favIds.has(r.track_id) ? '★' : '☆' }}</button>
+            <!-- 加入已有歌单（整批存新歌单走下面那件 SavePlaylistButton） -->
+            <AddToPlaylistButton v-if="r.track_id" :track-id="r.track_id" />
           </div>
           <!-- 「为什么推荐」和「和你过去喜欢的有什么关系」是这个功能的卖点，
                不是装饰。原则 4 要求推荐必须能解释，所以这两行不能省 -->

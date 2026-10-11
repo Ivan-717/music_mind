@@ -13,6 +13,7 @@ import {
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
 import CreatedPlaylistPanel from '@/components/CreatedPlaylistPanel.vue'
+import AddToPlaylistButton from '@/components/AddToPlaylistButton.vue'
 
 const { fmt, fmtDuration, providerLabel } = useDisplay()
 const player = usePlayerStore()
@@ -749,7 +750,11 @@ watch(currentId, (id) => {
 
           <span class="name">{{ fmt(t.title) }}</span>
           <span class="artist">{{ fmt(t.artists) }}</span>
-          <span class="album">{{ fmt(t.albumName) }}</span>
+          <!-- 专辑名 → 专辑详情页。只有对齐到本地专辑的才能跳（未入库的行保持纯文本） -->
+          <RouterLink v-if="t.albumId" class="album" :to="`/albums/${t.albumId}`">
+            {{ fmt(t.albumName) }}
+          </RouterLink>
+          <span v-else class="album">{{ fmt(t.albumName) }}</span>
           <!-- 可播的给按钮：网易云整曲优先，已对齐的失败自动退 iTunes 30 秒；
                没有任何音源的给同宽空位，列才对得齐 -->
           <button
@@ -789,6 +794,10 @@ watch(currentId, (id) => {
               : '还没进本地库，暂时收藏不了'"
             @click="toggleFavorite(t)"
           >{{ t.favorited ? '♥' : '♡' }}</button>
+
+          <!-- 加入自建歌单。未对齐的行禁用（不占位空位 —— 和 fav 同款，
+               反正 fav 也是同宽的禁用态，列不会歪） -->
+          <AddToPlaylistButton :track-id="t.matchedTrackId" :disabled="!t.matchedTrackId" />
 
           <button
             class="drop"

@@ -4,10 +4,56 @@ import { RouterLink, useRoute } from 'vue-router'
 import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream } from '@/api/chat'
 import { apiRunStatus } from '@/api/persona'
 import { useDisplay } from '@/composables/useDisplay'
+import { usePlayerStore } from '@/stores/player'
+import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import SavePlaylistButton from '@/components/SavePlaylistButton.vue'
+import AddToPlaylistButton from '@/components/AddToPlaylistButton.vue'
 
 const { fmt } = useDisplay()
+const player = usePlayerStore()
 const route = useRoute()
+
+// 推荐行的收藏（和报告页同款）：推荐原来只有文字，想收藏得跳页 ——
+// 反馈流不进来（评估发现 240 条推荐 0 收藏，不是没人要，是没通道）
+const favIds = ref(new Set())
+const favBusy = ref(null)
+
+async function loadFavIds() {
+  try {
+    favIds.value = new Set(await apiFavoriteIds())
+  } catch (e) { /* 收藏态拿不到不让页面挂 —— 按钮显示为未收藏 */ }
+}
+
+async function toggleFav(trackId) {
+  if (favBusy.value) return
+  favBusy.value = trackId
+  try {
+    if (favIds.value.has(trackId)) {
+      await apiUnfavorite(trackId)
+      favIds.value.delete(trackId)
+    } else {
+      await apiFavorite(trackId)
+      favIds.value.add(trackId)
+    }
+    favIds.value = new Set(favIds.value)   // 整体换新，模板里的 .has() 才重新求值
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    favBusy.value = null
+  }
+}
+
+/** 对话页的行内试听 —— 和报告页同一条路（player store 全局唯一）。
+    实测反馈：推荐了却听不了，是这里之前根本没有播放入口 */
+function playRec(r) {
+  player.play({
+    trackId: r.track_id,
+    name: r.name,
+    artistNames: r.artist_names,
+    // 播放条封面走 album_id（CoverImage 按专辑取图）；不传就是 ♪ 占位
+    albumId: r.album_id
+  })
+}
 
 const conversations = ref([])
 const current = ref(null)        // 会话 id
@@ -233,12 +279,13 @@ async function send() {
 }
 
 onMounted(async () => {
+  loadFavIds()          // 不 await：收藏态晚一点到没关系，不拖住会话加载
   await loadConversations()
   // 默认打开最新那个会话 —— 回来就是想接着聊
   if (conversations.value.length) await openConversation(conversations.value[0].id)
   loading.value = false
 
-  // 从别处带问题进来（搜索页的「去音乐探索问一句」走这条）：
+  // 从别处带问题进来（搜索页的「去深夜电台问一句」走这条）：
   // **只预填，不自动发送** —— 一次问答 20-40 秒 + 一次 LLM 调用，
   // 不能替用户按下去
   if (route.query.q) question.value = String(route.query.q)
@@ -262,29 +309,31 @@ function usePrompt(t) {
 
 <template>
   <div class="explore-head">
-    <h2>音乐探索</h2>
-    <div class="explore-bar">
+    <!-- on-air 灯 = 「电台开着」（全站唯一的常驻动效，和导航呼号同一盏） -->
+    <h2><span class="on-air" aria-hidden="true"></span>深夜电台</h2>
+    <!-- 会话管理条：**只有聊过才出现** —— 一条都没有时，「切换/换话题」没有对象，
+         两个同文案的入口并排只会显得像 bug（截图验收时抓到的） -->
+    <div v-if="conversations.length" class="explore-bar">
       <select
         class="conv-select"
         :value="current ?? ''"
         :disabled="running"
         @change="(e) => e.target.value === '' ? newConversation() : openConversation(Number(e.target.value))"
       >
-        <option value="">＋ 新对话</option>
+        <option value="">＋ 换个话题</option>
         <option v-for="c in conversations" :key="c.id" :value="c.id">
           {{ fmt(c.title) }}（{{ c.message_count }}）
         </option>
       </select>
-      <button :disabled="running" @click="newConversation">新对话</button>
-      <span class="muted">历史 {{ conversations.length }} 个</span>
+      <span class="muted">往期 {{ conversations.length }} 期</span>
     </div>
   </div>
   <div class="rule"></div>
   <!-- 正文限宽 720 —— 和人格报告同一条规则：长回答铺满 900 读起来累 -->
   <div class="chat-body">
   <p class="muted">
-    直接问，比如「我听得最多的是什么流派」「推荐几首安静的」。
-    <strong>要跑 20-40 秒</strong>，问完可以离开这个页面。
+    直接说，比如「我听得最多的是什么流派」「推荐几首安静的」。
+    <strong>要等一会儿（20-40 秒）</strong>——不用守着，先去别的页面逛，回来看也行。
   </p>
 
   <p v-if="error" class="err">{{ error }}</p>
@@ -308,7 +357,7 @@ function usePrompt(t) {
 
   <!-- 空态 = 一份可以点的节目单，不是一句「还没有数据」 -->
   <div v-else-if="!rendered.length && !running" class="explore-empty">
-    <p class="muted">还没有对话。今晚可以点这些，或者直接在下面打一行字：</p>
+    <p class="muted">电台还开着，今晚还没人来说话。可以直接在下面打一行字，或者点这些：</p>
     <ul class="prompt-list">
       <li v-for="(t, i) in PROMPTS" :key="t">
         <button :disabled="busy || running" @click="usePrompt(t)">
@@ -341,10 +390,28 @@ function usePrompt(t) {
         </ol>
 
         <ul v-if="m.recommendations.length" class="rec-list compact">
-          <li v-for="r in m.recommendations" :key="r.track_id" :data-track-id="r.track_id">
+          <li v-for="r in m.recommendations" :key="r.track_id" :data-track-id="r.track_id"
+              :class="{ playing: player.isCurrent(r.track_id) }">
             <div class="row">
+              <!-- 推荐的歌先试听 30 秒（没有试听源的不给按钮）—— 和报告页同一规矩 -->
+              <button
+                v-if="r.has_preview"
+                class="play"
+                :class="{ on: player.isCurrent(r.track_id) }"
+                :title="player.isCurrent(r.track_id) && player.playing ? '暂停' : '试听 30 秒'"
+                @click="playRec(r)"
+              >{{ player.isCurrent(r.track_id) && player.playing ? '❚❚' : '▶' }}</button>
               <span class="name">{{ fmt(r.name) || ('#' + r.track_id) }}</span>
               <span class="artist">{{ fmt(r.artist_names) }}</span>
+              <!-- 收藏 + 加入歌单：推荐行的表态通道（和报告页对齐） -->
+              <button
+                class="fav"
+                :class="{ on: favIds.has(r.track_id) }"
+                :disabled="favBusy === r.track_id"
+                :title="favIds.has(r.track_id) ? '取消收藏' : '加入收藏'"
+                @click="toggleFav(r.track_id)"
+              >{{ favIds.has(r.track_id) ? '★' : '☆' }}</button>
+              <AddToPlaylistButton v-if="r.track_id" :track-id="r.track_id" />
             </div>
             <p v-if="r.reason" class="reason">{{ fmt(r.reason) }}</p>
           </li>
@@ -385,7 +452,7 @@ function usePrompt(t) {
     <input
       v-model="question"
       class="ask-input"
-      placeholder="问点什么…"
+      placeholder="说点什么…"
       :disabled="busy || running"
       @keyup.enter="send"
     />

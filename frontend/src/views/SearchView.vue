@@ -385,7 +385,7 @@ watch(() => route.query.q, (q) => search(q))
         <p class="lookup-tip">
           本地没有这位歌手。可以
           <RouterLink :to="{ path: '/explore', query: { q: `我想了解 ${result.keyword}` } }">
-            去音乐探索问一句「我想了解 {{ result.keyword }}」</RouterLink>，
+            去深夜电台问一句「我想了解 {{ result.keyword }}」</RouterLink>，
           让 Agent 查过之后把代表专辑抓进来；或者
           <RouterLink to="/import">导入一张包含 TA 的歌单</RouterLink>。
         </p>

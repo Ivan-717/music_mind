@@ -6,6 +6,7 @@ import { apiFavoriteIds, apiFavorite, apiUnfavorite } from '@/api/favorite'
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
 import CoverImage from '@/components/CoverImage.vue'
+import AddToPlaylistButton from '@/components/AddToPlaylistButton.vue'
 
 const { fmt, fmtDuration } = useDisplay()
 
@@ -164,6 +165,7 @@ onMounted(async () => {
         >
           {{ favIds.has(t.trackId) ? '★' : '☆' }}
         </button>
+        <AddToPlaylistButton :track-id="t.trackId" />
       </li>
     </ul>
   </template>

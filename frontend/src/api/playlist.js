@@ -10,6 +10,14 @@ import http from './http'
 /** 我建过的歌单 */
 export const apiMyPlaylists = () => http.get('/playlists')
 
+/** 新建一张空歌单（只有名字）—— 不依赖 AI 推荐也能建 */
+export const apiCreatePlaylist = (name) =>
+  http.post('/playlists', { name })
+
+/** 往已有歌单里加一首（推荐行的「加入歌单」用） */
+export const apiAddTrackToPlaylist = (playlistId, trackId) =>
+  http.post(`/playlists/${playlistId}/tracks/${trackId}`)
+
 /**
  * 用一批曲目直接建一张歌单。返回 { id, name, added, skipped }
  *

@@ -4,6 +4,7 @@ import { apiFavoritePage, apiUnfavorite, apiUnfavoriteBatch } from '@/api/favori
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
 import CoverImage from '@/components/CoverImage.vue'
+import AddToPlaylistButton from '@/components/AddToPlaylistButton.vue'
 
 const { fmt, fmtDuration } = useDisplay()
 const player = usePlayerStore()
@@ -155,6 +156,7 @@ onMounted(load)
             <span v-else class="play" aria-hidden="true"></span>
             <span class="dur">{{ fmtDuration(it.durationMs) }}</span>
             <span class="time">{{ fmtTime(it.favoritedAt) }}</span>
+            <AddToPlaylistButton :track-id="it.trackId" />
             <button :disabled="busyId === it.trackId" @click="remove(it.trackId)">
               {{ busyId === it.trackId ? '…' : '取消收藏' }}
             </button>

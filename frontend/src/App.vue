@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useSettingsStore } from '@/stores/settings'
@@ -35,7 +35,26 @@ function logout() {
 
 // 刷新后把用户名找回来：token 在 localStorage 里活着，user 只在内存里（登录时赋值）——
 // 不补这一下，导航栏右上角刷新就变空（fetchMe 内部自判 token/user，不会重复请求）
-onMounted(() => { store.fetchMe() })
+// 【被截断的歌手名，hover 出全名】全局事件委托，不是逐处加 title：
+// 全站十来个曲目列表都有 .artist 列（150px + ellipsis），逐处加的话
+// 以后新加的列表一定会忘；委托一处，全都自动生效。
+// **只在真截断时挂**（scrollWidth > clientWidth）——没截断的行悬停弹一个
+// 和可见内容一样的 tooltip 是噪音。每次 hover 重算：v-for 复用 DOM 时
+// title 会带着上一行的旧值不放。
+function onArtistOver(e) {
+  const el = e.target
+  if (!(el instanceof Element) || !el.classList.contains('artist')) return
+  const truncated = el.scrollWidth > el.clientWidth
+  const full = el.textContent.trim()
+  if (truncated && full && el.title !== full) el.title = full
+  else if (!truncated && el.title) el.title = ''
+}
+
+onMounted(() => {
+  store.fetchMe()
+  document.addEventListener('mouseover', onArtistOver)
+})
+onUnmounted(() => document.removeEventListener('mouseover', onArtistOver))
 </script>
 
 <template>
@@ -50,7 +69,7 @@ onMounted(() => { store.fetchMe() })
       <RouterLink to="/favorites">我的收藏</RouterLink>
       <RouterLink to="/import">导入歌单</RouterLink>
       <RouterLink to="/my-playlist">我的歌单</RouterLink>
-      <RouterLink to="/explore">音乐探索</RouterLink>
+      <RouterLink to="/explore">深夜电台</RouterLink>
       <RouterLink to="/persona">音乐人格</RouterLink>
       <input
         v-model="kw"

@@ -2,7 +2,7 @@
    MusicMind — 深夜电台
 
    一个凌晨还在播的私人电台：你的曲库是它的唱片架，
-   人格报告是为你做的节目单，音乐探索是点播。
+   人格报告是为你做的节目单，深夜电台是点播。
 
    色彩是【角色制】，不是调色盘 ——
      · 琥珀 = 表盘灯：只给「正在发声的东西」和主操作。
@@ -456,6 +456,26 @@ img { background: var(--bg-soft); }
   color: var(--amber);
 }
 
+/* ===== 「加入歌单」下拉（各类曲目列表共用；文本按钮比 ★ 小一号）===== */
+.rec-list .addpl, .track-list .addpl, .fav-list .addpl,
+.my-track-list .addpl { font-size: 11.5px; }
+.addpl-wrap { position: relative; display: inline-flex; flex: none; }
+.addpl-panel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 190px; max-height: 240px; overflow-y: auto;
+  padding: 6px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-soft);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.addpl-panel button {
+  display: flex; width: 100%; align-items: center; gap: 8px;
+  padding: 7px 9px; border: none; background: none; cursor: pointer;
+  font-size: 13px; color: var(--dim); text-align: left; border-radius: 0;
+}
+.addpl-panel button:hover:not(:disabled) { color: var(--amber); }
+.addpl-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.addpl-done { color: var(--amber); font-size: 12px; }
+
 .nav-search {
   flex: 1;
   max-width: 300px;
@@ -615,6 +635,13 @@ img { background: var(--bg-soft); }
   border-color: var(--accent); background: var(--accent-bg); color: var(--accent);
 }
 .playlist-tabs .tab-count { color: var(--mute); font-size: 12px; }
+/* 「＋ 新建」：比歌单 tab 虚一档，不和它抢视觉 */
+.playlist-tabs .tab-add { border-style: dashed; color: var(--mute); }
+.playlist-tabs .rename-input { max-width: 180px; }
+
+/* 空态里的新建行（输入框 + 创建按钮） */
+.create-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+.create-row input { max-width: 240px; }
 .playlist-tabs .tab.active .tab-count { color: var(--accent); opacity: .7; }
 
 .my-track-list li {
@@ -629,6 +656,9 @@ img { background: var(--bg-soft); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .my-track-list .album { color: var(--mute); font-size: 13px; width: 170px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 专辑名列的链接态：布局和纯文本一模一样，hover 才显出可点 */
+.my-track-list a.album { text-decoration: none; display: block; }
+.my-track-list a.album:hover { color: var(--dim); text-decoration: underline; }
 .my-track-list .dur { width: 46px; text-align: right; color: var(--mute);
   font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 
@@ -878,13 +908,21 @@ img { background: var(--bg-soft); }
 .rec-list .relation { margin: 3px 0 0; color: var(--mute); font-size: 12px;
                       line-height: 1.6; font-style: italic; }
 
-/* ===== 音乐探索（点播台） =====
+/* ===== 深夜电台（点播台） =====
    这一页不是「表单 + 日志」，是点播：空态给你一份可以点的节目单，
    你说的那句话是「来电」（一根雾玫瑰竖线），回答是电台的声音（纸白正文） */
 
 .explore-head {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
+}
+/* 「深夜电台」标题旁一盏小 on-air 灯 —— 和导航呼号同一盏（琥珀只给发声的东西） */
+.explore-head h2 { display: flex; align-items: center; gap: 10px; }
+.explore-head .on-air {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(232, 169, 76, .75);
+  animation: on-air 3.4s ease-in-out infinite;
 }
 .explore-bar { display: flex; align-items: center; gap: 10px; }
 .explore-bar .conv-select { max-width: 300px; min-width: 170px;

@@ -14,7 +14,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import {
   apiMyPlaylists, apiPlaylistTracks, apiRenamePlaylist,
-  apiDeletePlaylist, apiRemovePlaylistTrack
+  apiDeletePlaylist, apiRemovePlaylistTrack, apiCreatePlaylist
 } from '@/api/playlist'
 import { apiFavorite, apiUnfavorite, apiFavoriteIds, apiFavoriteBatch }
   from '@/api/favorite'
@@ -39,6 +39,28 @@ const notice = ref('')
 
 const renaming = ref(false)         // 内联改名（不用 window.prompt —— 移动端会被拦）
 const renameText = ref('')
+
+// 新建空歌单（同内联模式）。【为什么必须有】原来唯一的建单路径是
+// 「把 AI 推荐存成歌单」—— 用户想自己攒一张歌单（不经过推荐）没有入口。
+const creating = ref(false)
+const createText = ref('')
+
+async function commitCreate() {
+  const name = createText.value.trim()
+  if (!name || working.value) return
+  working.value = true
+  error.value = ''
+  try {
+    const p = await apiCreatePlaylist(name)
+    creating.value = false
+    playlists.value = await apiMyPlaylists()
+    await openPlaylist(p.id)
+  } catch (e) {
+    error.value = e.response?.data?.message || e.message
+  } finally {
+    working.value = false
+  }
+}
 
 const current = computed(
   () => playlists.value.find((p) => p.id === currentId.value) || null)
@@ -182,8 +204,20 @@ onMounted(async () => {
   <p v-if="loading" class="muted">加载中…</p>
 
   <div v-else-if="!playlists.length" class="empty">
-    还没有建过歌单。去<RouterLink to="/explore">音乐探索</RouterLink>问一句，
-    把推荐「存成歌单」就会出现在这里。
+    <p>还没有建过歌单。可以从<RouterLink to="/explore">深夜电台</RouterLink>的推荐存一张，
+       或者现在就建一张空的：</p>
+    <p class="create-row">
+      <input
+        v-model="createText"
+        class="rename-input"
+        maxlength="80"
+        placeholder="给第一张歌单起个名字"
+        @keyup.enter="commitCreate"
+      />
+      <button :disabled="working || !createText.trim()" @click="commitCreate">
+        {{ working ? '创建中…' : '创建' }}
+      </button>
+    </p>
   </div>
 
   <template v-else>
@@ -198,6 +232,20 @@ onMounted(async () => {
           「{{ fmt(p.name) }}」
           <span v-if="p.trackCount != null" class="tab-count">{{ p.trackCount }}</span>
         </button>
+      </li>
+      <!-- 新建空歌单的入口，就挨在歌单 tab 的末尾（不再是「只能从推荐建」） -->
+      <li v-if="creating">
+        <input
+          v-model="createText"
+          class="rename-input"
+          maxlength="80"
+          placeholder="新歌单叫什么？"
+          @keyup.enter="commitCreate"
+          @keyup.esc="creating = false"
+        />
+      </li>
+      <li v-else>
+        <button class="tab tab-add" @click="creating = true; createText = ''">＋ 新建</button>
       </li>
     </ul>
 
@@ -243,6 +291,11 @@ onMounted(async () => {
 
         <span class="name">{{ fmt(t.name) }}</span>
         <span class="artist">{{ fmt(t.artistNames) }}</span>
+        <!-- 专辑名 → 专辑详情页（自建的歌都已入库，albumId 都有） -->
+        <RouterLink v-if="t.albumId" class="album" :to="`/albums/${t.albumId}`">
+          {{ fmt(t.albumName) }}
+        </RouterLink>
+        <span v-else-if="t.albumName" class="album">{{ fmt(t.albumName) }}</span>
         <span class="dur">{{ fmtDuration(t.durationMs) }}</span>
 
         <button
