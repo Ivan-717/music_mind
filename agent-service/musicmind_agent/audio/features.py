@@ -225,6 +225,19 @@ def extract(y: np.ndarray, sr: int = SAMPLE_RATE) -> AudioFeature:
     )
 
 
+# 能量的档位词。0.5 是归一化区间的中点，**不是调出来的**。
+# 【为什么放在这里】画像素材（persona）和对话工具（search_tracks /
+# similar_tracks 的「能量档」列）共用这一套 —— 两处各写一份的话阈值会
+# 漂移，同一个 0.4 在报告里说「很静」、在推荐理由里说「偏静」。
+# 2026-10-11 实测反馈：推荐理由直接报「能量 0.0931」，用户看不懂数值。
+_AROUSAL_BANDS = ((0.35, "很静"), (0.50, "偏静"), (0.65, "偏热烈"))
+_AROUSAL_TOP = "很热烈"
+
+
+def arousal_band(value: float) -> str:
+    return next((label for edge, label in _AROUSAL_BANDS if value < edge), _AROUSAL_TOP)
+
+
 def describe(feature: AudioFeature) -> str:
     """给人看的一行说明。
 

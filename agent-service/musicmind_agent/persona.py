@@ -31,14 +31,12 @@ class Trait:
     reading: str      # 中性读法（「0.42，偏静的一侧」）
 
 
-# 能量的档位。0.5 是归一化区间的中点，**不是调出来的**
-_AROUSAL_BANDS = ((0.35, "很静"), (0.50, "偏静"), (0.65, "偏热烈"))
-_AROUSAL_TOP = "很热烈"
-
-
 def _arousal_reading(value: float) -> str:
-    band = next((label for edge, label in _AROUSAL_BANDS if value < edge), _AROUSAL_TOP)
-    return f"{value:.2f}（0–1 量纲，0.5 是区间中点）→ {band}"
+    # 档位词和对话工具共用一套阈值（features.arousal_band）——
+    # 报告素材里的「偏静」和推荐理由里的「很静」必须是同一个标准
+    from musicmind_agent.audio.features import arousal_band
+
+    return f"{value:.2f}（0–1 量纲，0.5 是区间中点）→ {arousal_band(value)}"
 
 
 def _share_reading(value: float) -> str:

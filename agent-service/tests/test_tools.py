@@ -107,6 +107,58 @@ def test_search_tracks_warns_about_the_coverage_cost(monkeypatch):
     assert any("实测特征" in w for w in result.warnings), result.warnings
 
 
+def test_search_tracks_limits_per_artist(monkeypatch):
+    """【回归】每位艺人默认最多 2 首。
+
+    实测 2026-10-11：用户问「推荐几首安静的」，8 首里 7 首同一张电影原声带
+    （低能量档被一个艺人的目录包场）。多样性是硬约束，不交给 LLM 自觉。
+    """
+    pool = [track(i, artist_id=1, artist_name="甲", arousal_measured=0.20)
+            for i in range(101, 106)]
+    pool.append(track(110, artist_id=2, artist_name="乙", arousal_measured=0.25))
+    _pool(monkeypatch, pool)
+
+    result = call("search_tracks", _ctx([track(1)]),
+                  {"arousal_max": 0.4, "limit": 3})
+
+    artists = [r["艺人"] for r in result.rows]
+    assert artists == ["甲", "甲", "乙"], artists
+
+
+def test_search_tracks_backfills_before_truncating(monkeypatch):
+    """多样性是倾向不是阉割：候选够 limit 才让位，不够时宁可多给同一艺人，
+    也不把结果截短（用户要的是「几首」，不是「几个艺人」）。"""
+    _pool(monkeypatch, [track(i, artist_id=1, artist_name="甲", arousal_measured=0.20)
+                        for i in range(101, 106)])   # 只有甲的 5 首
+
+    result = call("search_tracks", _ctx([track(1)]),
+                  {"arousal_max": 0.4, "limit": 10})
+
+    assert len(result.rows) == 5, "候选不足时应回填，不能因为去重把结果截短"
+
+
+def test_search_tracks_puts_soundtracks_last(monkeypatch):
+    """原声带/古典是**软排序**（排后），不是过滤。
+
+    实测 2026-10-11：问「推荐几首安静的」返回 8 首里 7 首一张电影原声带 ——
+    器乐的能量天然低，会霸占能量筛选的头部。它们仍留在结果里（要的时候
+    拿得到），只是给人声曲让位。
+    """
+    pool = [
+        track(101, album_name="《不能說的秘密》電影原聲帶", arousal_measured=0.10),
+        track(102, album_name="普通的专辑", arousal_measured=0.20),
+        track(103, album_name="Classical Mood", arousal_measured=0.15),
+    ]
+    _pool(monkeypatch, pool)
+
+    result = call("search_tracks", _ctx([track(1)]),
+                  {"arousal_max": 0.4, "limit": 3})
+
+    names = [r["歌名"] for r in result.rows]
+    assert names[0] == "歌102", names        # 人声的先出
+    assert len(names) == 3                   # 器乐没被过滤，还在
+
+
 # ---------------------------------------------------------------
 # artist_affinity 的未入库半边（层 2：Wikidata 缓存）
 # ---------------------------------------------------------------

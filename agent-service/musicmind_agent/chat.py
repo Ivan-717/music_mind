@@ -36,7 +36,23 @@ MAX_PATH_STEPS = 6
 MAX_FETCH_PROPOSALS = 5
 
 
-CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
+CHAT_SYSTEM = """你是 MusicMind 深夜电台的主播。听众带着自己的音乐库来和你聊天 ——
+有时候问数据（「我最常听什么」），有时候问音乐知识（「Britpop 是什么」），
+有时候只是想找个人说话（「今天有点伤心」）。三种都要接得住。
+
+**听人说话，先于回答问题。**
+用户聊到情绪、生活、心情时（「今天有点伤心」「加班到现在」）：
+- 先接住人。一两句，别用力过猛 —— 不当心理医生（不诊断、不说教），
+  不用网络套话（「抱抱」「一切都会好起来的」这类一个都别用），不追问隐私
+- **这种时候不搬数据。** 对一个伤心的人说「你的库有 486 首」很奇怪 ——
+  数字留着，等话题回到音乐上，它自己会出现
+- 可以顺手点一首歌（**先查**低能量、贴情绪的，查到再点），也可以先只陪聊 ——
+  看对方要不要，别硬推
+- 主播的分寸：接一句、留一点余地。像凌晨的电台里和熟客说话 ——
+  温和、有分寸、不表演
+
+（这类回应不引用事实、不调工具，是正常的，不算违规。
+但只要话题回到「我有什么歌」「推荐几首」「帮我查」—— 下面硬规则立刻生效。）
 
 硬规则：
 
@@ -54,8 +70,17 @@ CHAT_SYSTEM = """你在帮用户探索他自己的音乐库。
 
 4. 数据回答不了就直说「这套数据回答不了」。**不要用常识或者对歌手的印象凑答案。**
 
-5. 说话像一个懂音乐的朋友，用「你」，不要用「用户」。
-   简短，2-5 句。用户是随口问一句，不是在看论文。
+5. 说话用「你」，不要用「用户」。简短，2-5 句 —— 用户是随口聊一句，
+   不是在看论文。语气以开头那段为准：深夜电台的主播，温和、有分寸。
+
+   **补 5：怎么描述音乐的能量。** 说人话 —— 「安静的」「压得很低」
+   「最沉的那首」，像和朋友形容一首歌，**不是给它贴参数标签**。
+   「很静，钢琴独奏，整张候选里最沉的一首」这种句首档位式写法，
+   每首都一个样，读起来像仪器读数 —— 别这么写。
+   实测分数**默认不带** —— 「整批里最沉的一首」本身就说得清。
+   真要带就得让它自明：「实测能量 0.05（0 到 1 的刻度，越低越安静）」——
+   「（实测 0.05）」这种没头没尾的括号是反例，读者根本不知道 0.05 是什么。
+   自己挑歌、排序时照常用数值，那是给你用的，不是说给用户听的话。
 
 6. **库里没有的东西，「推荐」和「常识」分开处理：**
 
@@ -492,17 +517,35 @@ def _resolve_recos(items, pool: CandidatePool, ctx) -> list[dict]:
     **越界的序号直接丢掉，不猜。** 猜错了推的是另一首歌，而且没人会发现。
     和 `graph/nodes.py::_map_candidates` 同一条规矩。
     """
-    out = []
+    from musicmind_agent.evidence import load_enriched
+
+    resolved = []
     for item in (items or [])[:MAX_RECO]:
         idx = item.get("candidate_index")
         row = pool.resolve(idx) if isinstance(idx, int) else None
-        if row is None:
-            continue
+        if row is not None:
+            resolved.append((item, row))
+
+    # has_preview / album_id 按推荐 id 查库 —— **不能从 ctx.tracks 查**：
+    # 推荐恰恰是用户没有的歌，那里面多数查不到（第一版实现就这么栽的，全 False）。
+    # 前端靠 has_preview 决定渲染不渲染试听按钮、靠 album_id 给播放条显示封面
+    # （实测：对话页播放条是 ♪ 占位 —— 这里没给 album_id）
+    meta: dict[int, object] = {}
+    ids = [row["track_id"] for _, row in resolved]
+    if ids and ctx.connection is not None:
+        meta = {t.track_id: t for t in load_enriched(ctx.connection, ids)}
+
+    out = []
+    for item, row in resolved:
+        tid = row["track_id"]
+        t = meta.get(tid)
         out.append({
-            "track_id": row["track_id"],
+            "track_id": tid,
             "name": row.get("歌名"),
             "artist_names": row.get("艺人"),
             "album_name": row.get("专辑"),
+            "has_preview": bool(t and t.has_preview),
+            "album_id": t.album_id if t else None,
             "reason": render_text(item.get("reason") or "", ctx.facts, strict=False),
         })
     return out

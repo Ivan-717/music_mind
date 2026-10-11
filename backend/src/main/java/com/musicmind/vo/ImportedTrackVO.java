@@ -11,6 +11,8 @@ public class ImportedTrackVO {
     private String title;
     private String artists;
     private String albumName;
+    /** 对齐到的本地专辑 id。未对齐是 null —— 前端据此决定专辑名是链接还是纯文本 */
+    private Long albumId;
     private Long durationMs;
     private String coverUrl;
     /** PENDING / MATCHED / UNRESOLVED */

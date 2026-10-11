@@ -183,7 +183,15 @@ public interface UserPlaylistMapper {
                    EXISTS(SELECT 1 FROM track_audio_feature f
                           WHERE f.track_id = u.matched_track_id
                             AND f.preview_url IS NOT NULL
-                            AND f.preview_url &lt;&gt; '') AS has_preview
+                            AND f.preview_url &lt;&gt; '') AS has_preview,
+                   -- 本地专辑 id：专辑名做跳转链接用。未对齐的行是 NULL（列保持纯文本）。
+                   -- 专辑的选择口径和 PlaylistMapper.selectTracks 一致（早发行的优先）
+                   (SELECT mr.album_id
+                      FROM release_track rt
+                      JOIN music_release mr ON mr.id = rt.release_id
+                     WHERE rt.track_id = u.matched_track_id
+                     ORDER BY mr.release_date IS NULL, mr.release_date, mr.id
+                     LIMIT 1) AS album_id
             FROM user_playlist_track u
             LEFT JOIN favorite_track ft
                    ON ft.user_id = u.user_id AND ft.track_id = u.matched_track_id

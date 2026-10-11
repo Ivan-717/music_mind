@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from musicmind_agent.audio.features import arousal_band
 from musicmind_agent.evidence import load_all_enriched
 from musicmind_agent.reco.recall import recommend
 from musicmind_agent.tools.base import ToolContext, ToolResult, cap_evidence, cov, register
@@ -321,6 +322,9 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
             "艺人": item.track.artist_name, "专辑": item.track.album_name,
             "发行年": item.track.year, "流派": list(item.track.genres),
             "能量": item.track.arousal_measured,
+            # 档位词给 LLM 写理由用（「很静」而不是「0.09」——数值用户看不懂）
+            "能量档": (arousal_band(item.track.arousal_measured)
+                     if item.track.arousal_measured is not None else None),
             # 这两个不给人看（prompt 白名单会挡掉），是映射时带给报告的：
             # hasPreview → 推荐列表的 ▶；albumId → 播放条上的封面
             "hasPreview": item.track.has_preview,
@@ -358,6 +362,8 @@ def similar_tracks(ctx: ToolContext, args: dict) -> ToolResult:
         "arousal_min": "能量下限",
         "exclude_track_ids": "要排除的曲目 id",
         "limit": "返回条数，默认 20",
+        "max_per_artist": "每位艺人最多几首，默认 2（保多样性；"
+                          "用户点名只要某个艺人时把它调大）",
     },
 )
 def search_tracks(ctx: ToolContext, args: dict) -> ToolResult:
@@ -399,7 +405,37 @@ def search_tracks(ctx: ToolContext, args: dict) -> ToolResult:
             return False
         return True
 
-    hits = [t for t in candidates if keep(t)][:limit]
+    hits = [t for t in candidates if keep(t)]
+
+    # 【器乐/原声的软排序 —— 排后，不是过滤】「安静的」按能量筛天然会命中
+    # 电影原声和古典（它们的能量就是低），但用户说「推荐几首歌」时心里要的是歌。
+    # 实测 2026-10-11：8 首里 7 首《不能說的秘密》原声带。命中的曲目仍然在
+    # 结果里（要的时候拿得到），只是不霸榜。Python 的 sort 稳定，同类保持原序。
+    def _instrumental(t) -> bool:
+        album = t.album_name or ""
+        if any(w in album for w in ("原聲", "原声", "OST", "Soundtrack")):
+            return True
+        g = " ".join(t.genres).lower()
+        return "classical" in g or "古典" in g
+
+    hits.sort(key=_instrumental)
+
+    # 【每位艺人最多 N 首 —— 多样性是硬约束，不交给 LLM 自觉】
+    # 实测 2026-10-11：用户问「推荐几首安静的」，返回 5 首里 3 首周杰伦 ——
+    # 低能量档恰好被他的目录包了。但**凑不够 limit 时回填**：多样性是倾向
+    # 不是阉割，宁可最后几首撞艺人，也不把结果截短。
+    max_per = max(1, int(args.get("max_per_artist") or 2))
+    seen: Counter = Counter()
+    diverse: list = []
+    overflow: list = []
+    for t in hits:
+        if t.artist_id is not None and seen[t.artist_id] >= max_per:
+            overflow.append(t)
+        else:
+            if t.artist_id is not None:
+                seen[t.artist_id] += 1
+            diverse.append(t)
+    hits = (diverse + overflow)[:limit]
 
     return ToolResult(
         tool="search_tracks",
@@ -408,6 +444,7 @@ def search_tracks(ctx: ToolContext, args: dict) -> ToolResult:
             "track_id": t.track_id, "歌名": t.track_name, "艺人": t.artist_name,
             "专辑": t.album_name, "发行年": t.year, "流派": list(t.genres),
             "能量": t.arousal_measured,
+            "能量档": arousal_band(t.arousal_measured) if t.arousal_measured is not None else None,
             "能量来源": "实测" if t.arousal_measured is not None else "无",
         } for t in hits],
         evidence=cap_evidence([ctx.evidence_for(t, why="条件命中") for t in hits]),
