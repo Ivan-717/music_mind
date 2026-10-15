@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "musicmind": {
+      "command": "C:\\Users\\DELL\\Desktop\\music_agent\\agent-service\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "musicmind_agent.mcp_server", "--user", "34"],
+      "env": {
+        "PYTHONPATH": "C:\\Users\\DELL\\Desktop\\music_agent\\agent-service"
+      }
+    }
+  }
+}

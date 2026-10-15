@@ -35,26 +35,30 @@ function logout() {
 
 // 刷新后把用户名找回来：token 在 localStorage 里活着，user 只在内存里（登录时赋值）——
 // 不补这一下，导航栏右上角刷新就变空（fetchMe 内部自判 token/user，不会重复请求）
-// 【被截断的歌手名，hover 出全名】全局事件委托，不是逐处加 title：
-// 全站十来个曲目列表都有 .artist 列（150px + ellipsis），逐处加的话
-// 以后新加的列表一定会忘；委托一处，全都自动生效。
+// 【被截断的文本，hover 出全名】全局事件委托：**按视觉判断**（有
+// text-overflow: ellipsis 样式的元素），不认类名 —— 类名白名单永远追不全
+// （实测踩过：专辑页头部的歌手名是 .album-meta 下的裸 span，带 .artist
+// 类名的委托没覆盖它，用户一眼就发现了）；按样式判断则含未来一切截断元素。
 // **只在真截断时挂**（scrollWidth > clientWidth）——没截断的行悬停弹一个
 // 和可见内容一样的 tooltip 是噪音。每次 hover 重算：v-for 复用 DOM 时
 // title 会带着上一行的旧值不放。
-function onArtistOver(e) {
+function onTruncatedOver(e) {
   const el = e.target
-  if (!(el instanceof Element) || !el.classList.contains('artist')) return
-  const truncated = el.scrollWidth > el.clientWidth
+  if (!(el instanceof Element)) return
+  if (getComputedStyle(el).textOverflow !== 'ellipsis') return
   const full = el.textContent.trim()
-  if (truncated && full && el.title !== full) el.title = full
-  else if (!truncated && el.title) el.title = ''
+  if (el.scrollWidth > el.clientWidth) {
+    if (full && el.title !== full) el.title = full
+  } else if (el.title) {
+    el.title = ''
+  }
 }
 
 onMounted(() => {
   store.fetchMe()
-  document.addEventListener('mouseover', onArtistOver)
+  document.addEventListener('mouseover', onTruncatedOver)
 })
-onUnmounted(() => document.removeEventListener('mouseover', onArtistOver))
+onUnmounted(() => document.removeEventListener('mouseover', onTruncatedOver))
 </script>
 
 <template>

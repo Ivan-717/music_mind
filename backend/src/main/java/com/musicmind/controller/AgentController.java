@@ -10,6 +10,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import com.musicmind.service.AgentEventRegistry;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +34,8 @@ public class AgentController {
 
     private final AgentService agentService;
     private final IngestionService ingestionService;
+
+    private final AgentEventRegistry eventRegistry;
 
     /**
      * 排一次报告生成。
@@ -129,5 +134,18 @@ public class AgentController {
     public Map<String, Object> claimType(@PathVariable Long id,
                                          @RequestBody Map<String, String> body) {
         return agentService.claimType(CurrentUser.id(), id, body.get("name"));
+    }
+
+    /**
+     * 订阅一轮 run 的实时进度（阶段 1：只有 stage 事件，数据仍走轮询）。
+     *
+     * 【为什么前端不用 EventSource】它带不了 Authorization 头；前端走
+     * fetch + ReadableStream 手写 SSE 解析（见 api/chat.js 的 streamRun）。
+     * 【归属校验】不属于当前用户直接 404 —— 和 /runs/{id} 同一句话术。
+     */
+    @GetMapping(path = "/runs/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@PathVariable Long id) {
+        agentService.assertRunOwned(id, CurrentUser.id());
+        return eventRegistry.register(id);
     }
 }

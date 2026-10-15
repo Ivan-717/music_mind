@@ -17,6 +17,14 @@ import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.nio.file.StandardOpenOption;
+
 /**
  * Agent 队列的执行者：单线程顺序消费 agent_run。
  *
@@ -47,6 +55,8 @@ public class AgentWorker implements SmartLifecycle {
     private volatile Long currentRunId;
     private volatile String currentLabel;
     private long lastSweepAt = 0;
+
+    private final AgentEventRegistry eventRegistry;
 
     // ============================================================
     // 生命周期
@@ -219,6 +229,9 @@ public class AgentWorker implements SmartLifecycle {
                     run.getId(), System.currentTimeMillis() - startedAt);
         }
 
+        // 把还在看进度的客户端正常关流（没人订阅就什么都不做）
+        eventRegistry.complete(run.getId());
+
         currentRunId = null;
         currentLabel = null;
     }
@@ -227,6 +240,7 @@ public class AgentWorker implements SmartLifecycle {
     // 子进程
     // ============================================================
 
+    /** 起 python 子进程。成功（退出码 0）返回 null，失败返回原因 */
     /** 起 python 子进程。成功（退出码 0）返回 null，失败返回原因 */
     private String runPython(String subcommand, Long runId) {
         Path logFile = Paths.get(props.getLogDir()).resolve("run-" + runId + ".log");
@@ -243,10 +257,19 @@ public class AgentWorker implements SmartLifecycle {
 
             // 见类注释的 1、2 —— 这两条不设，失败现场会非常误导
             builder.redirectErrorStream(true);
-            builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
+            // 【本次改动】原来 stdout 直写日志文件（appendTo），Java 看不到内容；
+            // 现在 PIPE 自己读：一行两用 —— 照旧落日志 + 是 NDJSON 就转发。
+            // redirectErrorStream(true) 保持不动：stderr 混进来只是「不是 JSON 的行」，
+            // 读线程按普通日志放过，不破坏解析
+            builder.redirectOutput(ProcessBuilder.Redirect.PIPE);
             builder.environment().put("PYTHONIOENCODING", "utf-8");
 
             Process process = builder.start();
+
+            Thread reader = new Thread(() -> pumpOutput(process, runId, logFile),
+                    "agent-stdout-" + runId);
+            reader.setDaemon(true);
+            reader.start();
 
             try {
                 if (!process.waitFor(props.getJobTimeoutSeconds(), TimeUnit.SECONDS)) {
@@ -259,6 +282,11 @@ public class AgentWorker implements SmartLifecycle {
                 process.destroyForcibly();
                 Thread.currentThread().interrupt();
                 return "被中断";
+            }
+            try {
+                reader.join(500);   // 正常退出：等读线程把管道尾巴排干，日志不丢行
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
 
             if (process.exitValue() != 0) {
@@ -291,5 +319,33 @@ public class AgentWorker implements SmartLifecycle {
             return null;
         }
         return s.length() <= max ? s : s.substring(0, max);
+    }
+
+    /** stdout 一行两用：照旧落日志；是 NDJSON stage 事件就转发给等进度的人。
+
+     * 进程被强杀时管道断掉是预期路径（IOException 静默）；半行/坏 JSON
+     * 按普通日志放过 —— 进度坏一点，绝不许影响任务本身。 */
+    private void pumpOutput(Process process, Long runId, Path logFile) {
+        ObjectMapper mapper = new ObjectMapper();
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+             BufferedWriter logOut = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8,
+                     StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            String line;
+            while ((line = in.readLine()) != null) {
+                logOut.write(line);
+                logOut.newLine();
+                logOut.flush();
+                if (!line.startsWith("{\"t\"")) continue;
+                try {
+                    JsonNode node = mapper.readTree(line);
+                    if ("stage".equals(node.path("t").asText())) {
+                        eventRegistry.stage(runId, node.path("note").asText());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (IOException ignored) {
+        }
     }
 }

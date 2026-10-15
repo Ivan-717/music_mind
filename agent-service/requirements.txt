@@ -28,3 +28,5 @@ numpy
 
 # 向量库。**纯客户端**，不带 fastembed —— embedding 用 Ollama
 qdrant-client
+
+mcp

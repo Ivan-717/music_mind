@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream } from '@/api/chat'
+import { apiChat, apiMyConversations, apiConversationDetail, apiFetchUpstream,
+         streamRun } from '@/api/chat'
 import { apiRunStatus } from '@/api/persona'
 import { useDisplay } from '@/composables/useDisplay'
 import { usePlayerStore } from '@/stores/player'
@@ -67,6 +68,10 @@ const elapsed = ref(0)
 
 let pollTimer = null
 let tickTimer = null
+let abortStream = null
+// SSE 旁路推来的最新进度文案（「已查：search_tracks（12 条）」…）。
+// 拿不到就退回固定文案 —— 它只是好看，正确性不靠它
+const stageNote = ref('')
 
 const POLL_MS = 3000
 const ESTIMATE_SECONDS = 25
@@ -218,6 +223,7 @@ function startPoll() {
 function stopPoll() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   if (tickTimer) { clearInterval(tickTimer); tickTimer = null }
+  if (abortStream) { abortStream(); abortStream = null }
   running.value = false
 }
 
@@ -270,7 +276,10 @@ async function send() {
     messages.value = [...messages.value, { id: `local-${Date.now()}`, role: 'user', content: q }]
     question.value = ''
     running.value = true
+    stageNote.value = ''
     startPoll()
+    // 进度旁路：后端上了才有事件，没上（404）静默退回固定文案
+    abortStream = streamRun(r.runId, (n) => { stageNote.value = n })
   } catch (e) {
     error.value = e.response?.data?.message || e.message
   } finally {
@@ -350,7 +359,7 @@ function usePrompt(t) {
 
   <div v-else-if="running" class="persona-progress">
     <div class="bar"><span :style="{ width: progress + '%' }"></span></div>
-    <p class="muted">正在查数据… {{ elapsed }} 秒</p>
+    <p class="muted">{{ stageNote || '正在查数据…' }} {{ elapsed }} 秒</p>
   </div>
 
   <p v-if="loading" class="muted">加载中…</p>

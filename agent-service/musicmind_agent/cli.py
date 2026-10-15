@@ -229,9 +229,15 @@ def cmd_chat(args: argparse.Namespace) -> int:
     from musicmind_agent.chat import chat_and_persist
     from musicmind_agent.persist import mark_failed
 
+    def emit(note: str) -> None:
+        # 【flush 是命门】stdout 默认块缓冲 —— 不 flush 的话进度全攒在
+        # 缓冲区里，Java 读线程要等进程退出才看得到，等于没流
+        print(json.dumps({"t": "stage", "note": note}, ensure_ascii=False),
+              flush=True)
+
     connection = get_connection()
     try:
-        chat_and_persist(connection, args.run_id)
+        chat_and_persist(connection, args.run_id, on_stage=emit)
     except Exception as e:
         try:
             mark_failed(connection, args.run_id, f"{type(e).__name__}: {e}")

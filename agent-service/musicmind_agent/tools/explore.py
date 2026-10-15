@@ -226,47 +226,10 @@ def artist_deep_dive(ctx: ToolContext, args: dict) -> ToolResult:
     )
 
 
-# ============================================================
-# 地区
-# ============================================================
-
-@register(
-    "region_distribution", 1,
-    "艺人的出身国家/地区分布。**这是艺人出身地，不是音乐风格地区**",
-)
-def region_distribution(ctx: ToolContext, args: dict) -> ToolResult:
-    tracks = ctx.tracks
-    total = len(tracks)
-    counter: Counter = Counter()
-    examples: dict[str, list] = {}
-    for t in tracks:
-        code = t.country_code or "未知"
-        counter[code] += 1
-        examples.setdefault(code, [])
-        if len(examples[code]) < 3:
-            examples[code].append(t)
-
-    known = sum(n for code, n in counter.items() if code != "未知")
-
-    facts = {"region.distinct": len([c for c in counter if c != "未知"])}
-    for code, count in counter.most_common(10):
-        facts[f"region.{code}.tracks"] = count
-        facts[f"region.{code}.share"] = round(count / total, 4) if total else 0
-
-    return ToolResult(
-        tool="region_distribution",
-        facts=facts,
-        rows=[{"地区代码": code, "曲目数": count,
-               "占比": f"{count / total * 100:.1f}%" if total else "0%"}
-              for code, count in counter.most_common(12)],
-        evidence=cap_evidence([
-            ctx.evidence_for(t, why=code) for code in counter for t in examples.get(code, [])
-        ]),
-        coverage=cov(total, known,
-                     "**地区码是 ISO 3166（CN/TW/HK/JP…），是艺人的出身地，"
-                     "不是音乐风格上的地区**。展示层负责映射成中文。"
-                     "库里没有发行地区数据，别把它当发行地"),
-    )
+# 【这里曾有一份 region_distribution 的 Tier 1 版本 —— 已删】
+# 它和 profile.py 的 Tier 0 版本同名注册，REGISTRY 后写覆盖：真正生效的一直是
+# profile.py 那份，这里是死代码（2026-10-11 清掉）。tier 0 是刻意的：
+# 音乐人格「型」匹配需要 region fact 每次都在（见 tests/test_contracts.py:101）。
 
 
 # ============================================================

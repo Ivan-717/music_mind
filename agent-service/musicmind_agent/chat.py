@@ -308,8 +308,18 @@ def _format_result(name: str, data: dict, pool: CandidatePool) -> str:
 # ============================================================
 
 def chat(connection, user_id: int, message: str,
-         history: list[dict], provider: str) -> dict:
+         history: list[dict], provider: str,
+         on_stage=None) -> dict:
     """跑一轮对话。返回 {answer, recommendations, used_tools}。"""
+
+    def stage(note: str) -> None:
+        """进度是旁路 —— 回调抛异常绝不能影响回答本身。"""
+        if on_stage is None:
+            return
+        try:
+            on_stage(note)
+        except Exception:
+            pass
 
     ctx = build_context(connection, user_id, None, SCOPE_ALL, None)
     client = LLMClient(provider=provider)
@@ -348,9 +358,19 @@ def chat(connection, user_id: int, message: str,
     allowed = {t["name"] for t in catalog()}
 
     for _round in range(MAX_CHAT_ROUNDS):
-        raw, _resp = client.chat_json(messages)
+        # 第 1 轮 = 模型在读你的问题；之后的轮次 = 上一轮工具结果已喂回，
+        # 模型正在写（如果它又要调工具，下面的「已查」会立刻覆盖，信息不会卡住）
+        stage("正在理解你的问题…" if _round == 0 else "正在写回答…")
 
+        raw, _resp = client.chat_json(messages)
         calls = raw.get("calls") or []
+        if calls:
+            for req in calls[:MAX_TOOLS_PER_ROUND]:
+                ...
+                result = call(name, ctx, req.get("args") or {})
+                ...
+                rows = len(result.rows or [])
+                stage(f"已查：{name}（{rows} 条）" if rows else f"已查：{name}")
         if calls:
             blocks = []
             for req in calls[:MAX_TOOLS_PER_ROUND]:
@@ -563,7 +583,7 @@ def _load_history(connection, conversation_id: int) -> list[dict]:
         return list(cursor.fetchall())
 
 
-def chat_and_persist(connection, run_id: int) -> None:
+def chat_and_persist(connection, run_id: int, on_stage=None) -> None:
     """从 agent_run 领一条 chat 任务，跑，写回消息。"""
 
     from musicmind_agent.persist import load_run
@@ -580,7 +600,8 @@ def chat_and_persist(connection, run_id: int) -> None:
 
     history = _load_history(connection, conversation_id)
 
-    result = chat(connection, run["user_id"], run["question"], history, run["provider"])
+    result = chat(connection, run["user_id"], run["question"], history, run["provider"],
+                  on_stage=on_stage)
 
     with connection.cursor() as cursor:
         # 先记用户那句，再记回答 —— 顺序就是 UI 里的显示顺序

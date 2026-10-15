@@ -372,4 +372,11 @@ public class AgentService {
         reportMapper.updateType(reportId, userId, name);
         return Map.of("personaType", name);
     }
+
+    /** 校验这条 run 属于当前用户 —— 不是就 404（和 runStatus 同一句话术） */
+    public void assertRunOwned(Long runId, Long userId) {
+        if (runMapper.findOwned(runId, userId) == null) {
+            throw new ApiException(404, "任务不存在");
+        }
+    }
 }
